@@ -5,6 +5,8 @@ speaker is shown a text prompt in two languages, records audio for each,
 can edit the prompt text and replay recordings before saving, and the app
 advances through the corpus in order.
 
+![Speech Compilation app](assets/app.png)
+
 ## Setup
 
 Requires Python >= 3.12 and [uv](https://docs.astral.sh/uv/).

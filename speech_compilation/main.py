@@ -14,6 +14,7 @@ LANGUAGE_NAMES = {
     "eng": "English",
 }
 
+FLASHCARDS_TEXT_LINES=2
 
 def list_corpora():
     paths = sorted(glob.glob(os.path.join(DATA_DIR, "flashcards_*.csv")))
@@ -81,6 +82,18 @@ def lang_prompt_label(lang_col):
     return f"{name} ({lang_col})"
 
 
+CUSTOM_CSS = """
+.gradio-container {
+    max-width: 100% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+.prompt-text textarea {
+    font-size: 3.5rem !important;
+    line-height: 1.4 !important;
+}
+"""
+
 with gr.Blocks(title="Speech Compilation") as demo:
     flashcards_paths = list_corpora()
 
@@ -110,13 +123,13 @@ with gr.Blocks(title="Speech Compilation") as demo:
     with gr.Row():
         with gr.Column():
             lang1_label = gr.Markdown()
-            text1 = gr.Textbox(label="Prompt text", lines=2)
+            text1 = gr.Textbox(label="Prompt text", lines=FLASHCARDS_TEXT_LINES, elem_classes=["prompt-text"])
             audio1 = gr.Audio(sources=["microphone"], type="filepath", label="Record")
             replay1 = gr.Audio(label="Playback", interactive=False)
 
         with gr.Column():
             lang2_label = gr.Markdown()
-            text2 = gr.Textbox(label="Prompt text", lines=2)
+            text2 = gr.Textbox(label="Prompt text", lines=FLASHCARDS_TEXT_LINES, elem_classes=["prompt-text"])
             audio2 = gr.Audio(sources=["microphone"], type="filepath", label="Record")
             replay2 = gr.Audio(label="Playback", interactive=False)
 
@@ -252,4 +265,4 @@ with gr.Blocks(title="Speech Compilation") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(css=CUSTOM_CSS)
