@@ -227,3 +227,4 @@ whisper-quechua-lora/
 whisper-quechua-lora-final/
 
 *.arrow
+*.wav
