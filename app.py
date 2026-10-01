@@ -2,7 +2,7 @@ import gradio as gr
 import torch
 from transformers import pipeline
 from TTS.api import TTS
-import scipy.io.wavfile as wavfile
+import librosa
 
 # 1. Determine Mac Hardware Acceleration
 device = "mps" if torch.backends.mps.is_available() else "cpu"
@@ -31,8 +31,9 @@ def process_audio(audio_path):
     if not audio_path:
         return None, "No audio provided."
         
-    # Step A: Speech to Text
-    stt_result = stt_model(audio_path, generate_kwargs={"language": "spanish"})
+    # Step A: Decode and resample before passing audio to Whisper.
+    audio_array, _ = librosa.load(audio_path, sr=16000, mono=True)
+    stt_result = stt_model(audio_array, generate_kwargs={"language": "spanish"})
     transcribed_text = stt_result["text"]
     
     # Step B: NLP (Mock)

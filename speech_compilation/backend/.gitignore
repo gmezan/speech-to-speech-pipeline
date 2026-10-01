@@ -95,7 +95,7 @@ ipython_config.py
 #   install all needed dependencies.
 # Pipfile.lock
 
-# UV
+# uv
 #   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
@@ -218,12 +218,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-.venv/
-output.wav
-quechua_ready.tar.gz
-quechua_whisper_ready/
-whisper-quechua-lora/
-whisper-quechua-lora-final/
-
-*.arrow
