@@ -230,3 +230,4 @@ whisper-quechua-lora-final/
 *.wav
 *.env
 *.venv
+*.pem
