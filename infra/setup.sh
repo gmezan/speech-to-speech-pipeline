@@ -9,5 +9,10 @@ uv venv --python 3.11
 source .venv/bin/activate
 uv sync
 export HF_TOKEN=<your_huggingface_token>
-uv run main.py --push-to-hub --hub-repo-id gmezan/whisper-quechua
+export HF_USERNAME=<your_huggingface_username>
 
+# STT (pushes to $HF_USERNAME/whisper-quechua)
+uv run main.py --push-to-hub
+
+# TTS (pushes to $HF_USERNAME/vits-quechua)
+uv run main.py --push-to-hub

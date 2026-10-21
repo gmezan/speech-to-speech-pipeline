@@ -1,10 +1,13 @@
 # Recommended schema: parallel Quechua–Spanish corpus
 
-Today's source, `josemercado/quechua-chanka-asr`, only has Quechua
-(`audio` + `TEXTO`). The parallel data-collection effort is adding a Spanish
-counterpart for each row. This is the recommended shape for that combined
-dataset, so the raw data can keep growing/changing without breaking
-`preprocessing/` or anything built on top of it.
+The live dataset, [`gmezan/quechua-spanish-parallel`](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel),
+follows this shape. It was bootstrapped (`scripts/bootstrap_init_dataset.py`)
+from `josemercado/quechua-chanka-asr`, which only had Quechua (`audio` +
+`TEXTO`) — so today every row has `text_quy`/`audio_quy` populated and the
+Spanish columns blank. The parallel data-collection effort is filling in the
+Spanish counterpart for each row over time. This shape lets the raw data keep
+growing/changing without breaking `preprocessing/` or anything built on top
+of it.
 
 ## Columns
 

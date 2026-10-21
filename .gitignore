@@ -225,6 +225,9 @@ quechua_ready.tar.gz
 quechua_whisper_ready/
 whisper-quechua-lora/
 whisper-quechua-lora-final/
+tts/finetune_hf_vits/mms-tts-*-train/
+tts/finetune_hf_vits/tmp_*
+tts/vits-*/
 
 *.arrow
 *.wav

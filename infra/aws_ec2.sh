@@ -1,4 +1,6 @@
-aws ec2 run-instances \
+set -euo pipefail
+
+INSTANCE_ID=$(aws ec2 run-instances \
     --image-id "ami-0d80e0723483d86f6" \
     --instance-type "g5.xlarge" \
     --key-name "aws-personal-eus1" \
@@ -45,4 +47,16 @@ aws ec2 run-instances \
         "HostnameType": "ip-name",
         "EnableResourceNameDnsARecord": true,
         "EnableResourceNameDnsAAAARecord": false
-    }'
+    }' \
+    --query 'Instances[0].InstanceId' \
+    --output text)
+
+echo "Launched instance $INSTANCE_ID, waiting for it to enter 'running' state..."
+aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+
+PUBLIC_IP=$(aws ec2 describe-instances \
+    --instance-ids "$INSTANCE_ID" \
+    --query 'Reservations[0].Instances[0].PublicIpAddress' \
+    --output text)
+
+echo "Instance $INSTANCE_ID is running. Public IP: $PUBLIC_IP"

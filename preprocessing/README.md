@@ -1,9 +1,10 @@
 # preprocessing
 
-Prepares the [josemercado/quechua-chanka-asr](https://huggingface.co/datasets/josemercado/quechua-chanka-asr)
-dataset (Chanka Quechua speech paired with `TEXTO` transcriptions) for Whisper
-fine-tuning: resamples audio to 16kHz, extracts log-Mel features, tokenizes
-labels, and saves the result to disk with `datasets.save_to_disk`.
+Prepares the [gmezan/quechua-spanish-parallel](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel)
+dataset (Chanka Quechua speech paired with `text_quy` transcriptions, see
+[dataset-schema.md](./docs/dataset-schema.md)) for Whisper fine-tuning:
+resamples audio to 16kHz, extracts log-Mel features, tokenizes labels, and
+saves the result to disk with `datasets.save_to_disk`.
 
 ## Usage
 
@@ -25,20 +26,22 @@ So a training step can just `load_dataset(repo_id)` instead of needing the
 local output directory, push the processed dataset straight to the Hub:
 
 ```sh
-uv run main.py --push-to-hub --hub-repo-id <your-username>/quechua-whisper-ready
+uv run main.py --push-to-hub
 ```
 
-This needs write access to that repo. Create a `.env` file in this directory
-(already covered by the repo's root `.gitignore`, so it won't get committed)
-with:
+`--hub-repo-id` defaults to `$HF_USERNAME/quechua-whisper-ready` (override
+with `--hub-repo-id` directly if needed). This needs write access to that
+repo. Create a `.env` file in this directory (already covered by the repo's
+root `.gitignore`, so it won't get committed) with:
 
 ```
 HF_TOKEN=hf_...
+HF_USERNAME=<your-hf-username>
 ```
 
 `main.py` loads it automatically via `python-dotenv` before touching the
-Hub — no need to `export` it in your shell. Add `--private` to create the
-repo as private.
+Hub — no need to `export` either in your shell. Add `--private` to create
+the repo as private.
 
 ## Docs
 

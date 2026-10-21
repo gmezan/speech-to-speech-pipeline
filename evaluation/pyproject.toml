@@ -1,0 +1,15 @@
+[project]
+name = "evaluation"
+version = "0.1.0"
+description = "WER/CER evaluation for the stt/ and tts/ models"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "datasets>=5.0.1",
+    "jiwer>=3.0.0",
+    "librosa>=0.11.0",
+    "python-dotenv>=1.0.0",
+    "soundfile>=0.14.0",
+    "torch>=2.4.0",
+    "transformers>=5.17.0",
+]

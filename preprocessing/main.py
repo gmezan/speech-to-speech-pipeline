@@ -1,5 +1,6 @@
 import argparse
 import io
+import os
 
 import librosa
 import soundfile as sf
@@ -7,12 +8,16 @@ from datasets import Audio, load_dataset
 from dotenv import load_dotenv
 from transformers import WhisperProcessor
 
-DEFAULT_DATASET = "josemercado/quechua-chanka-asr"
+load_dotenv()
+
+HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
+DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
 DEFAULT_SPLIT = "train"
-DEFAULT_AUDIO_COLUMN = "audio"
-DEFAULT_TEXT_COLUMN = "TEXTO"
+DEFAULT_AUDIO_COLUMN = "audio_quy"
+DEFAULT_TEXT_COLUMN = "text_quy"
 DEFAULT_MODEL = "openai/whisper-small"
 DEFAULT_OUTPUT_DIR = "./quechua_whisper_ready"
+DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/quechua-whisper-ready"
 SAMPLING_RATE = 16000
 
 
@@ -34,7 +39,8 @@ def parse_args():
     )
     parser.add_argument(
         "--hub-repo-id",
-        help="Target dataset repo id, e.g. 'myorg/quechua-whisper-ready'. Required with --push-to-hub",
+        default=DEFAULT_HUB_REPO_ID,
+        help="Target dataset repo id. Defaults to '$HF_USERNAME/quechua-whisper-ready'",
     )
     parser.add_argument("--private", action="store_true", help="Create the Hub repo as private")
     parser.add_argument(
@@ -73,7 +79,6 @@ def build_prepare_fn(processor, audio_column, text_column):
 
 
 def main():
-    load_dotenv()
     args = parse_args()
 
     print(f"1. Loading Whisper processor ({args.model})...")

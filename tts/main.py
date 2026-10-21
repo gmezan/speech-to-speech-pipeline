@@ -1,93 +1,92 @@
 import argparse
-import csv
-import io
+import glob
+import json
 import os
+import subprocess
+import sys
+import tempfile
 
-import librosa
-import soundfile as sf
-import torch
-from datasets import Audio, load_dataset
 from dotenv import load_dotenv
-from huggingface_hub import HfApi
-from trainer import Trainer, TrainerArgs
-from TTS.config.shared_configs import BaseDatasetConfig
-from TTS.tts.configs.shared_configs import CharactersConfig
-from TTS.tts.configs.vits_config import VitsConfig
-from TTS.tts.datasets import load_tts_samples
-from TTS.tts.models.vits import Vits, VitsAudioConfig
-from TTS.tts.utils.text.tokenizer import TTSTokenizer
-from TTS.utils.audio import AudioProcessor
 
-# Same underlying Quechua speech corpus `stt/` trains on, but pulled in its
-# *raw* form (audio + transcript) rather than the Whisper-preprocessed form
-# `preprocessing/` produces: VITS needs raw waveform + plain text, not
-# log-Mel features tokenized against Whisper's vocabulary (see README).
-DEFAULT_DATASET = "josemercado/quechua-chanka-asr"
-DEFAULT_SPLIT = "train"
-DEFAULT_AUDIO_COLUMN = "audio"
-DEFAULT_TEXT_COLUMN = "TEXTO"
-DEFAULT_SAMPLE_RATE = 22050
-DEFAULT_DATA_DIR = "./tts_data"
-DEFAULT_OUTPUT_PATH = "./vits-stt-output"
-DEFAULT_RUN_NAME = "quechua_vits"
-SPEAKER_NAME = "quechua_speaker"
+HERE = os.path.dirname(os.path.abspath(__file__))
+FINETUNE_DIR = os.path.join(HERE, "finetune_hf_vits")
+CONVERT_SCRIPT = os.path.join(FINETUNE_DIR, "convert_original_discriminator_checkpoint.py")
+TRAIN_SCRIPT = os.path.join(FINETUNE_DIR, "run_vits_finetuning.py")
+MONOTONIC_ALIGN_DIR = os.path.join(FINETUNE_DIR, "monotonic_align")
+
+load_dotenv()
+
+HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
+
+# Same underlying Quechua speech corpus `stt/` trains on, pulled in its raw
+# form (audio + transcript) — fine-tuning here starts from Meta's
+# pretrained MMS-TTS checkpoint for this exact language variant
+# (facebook/mms-tts-quy), via the vendored `finetune_hf_vits/` toolkit
+# (github.com/ylacombe/finetune-hf-vits, MIT licensed). See README.
+DEFAULT_LANGUAGE_CODE = "quy"
+DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
+DEFAULT_AUDIO_COLUMN = "audio_quy"
+DEFAULT_TEXT_COLUMN = "text_quy"
+DEFAULT_SAMPLE_TEXT = "Achikyaqta parayta qallarimun."
+DEFAULT_OUTPUT_DIR = "./vits-quy-finetuned"
+DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/vits-quechua"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Fine-tune a VITS TTS model on the Quechua speech corpus."
+        description="Fine-tune MMS-TTS (VITS) for Quechua on the speech corpus, via the vendored finetune_hf_vits toolkit."
+    )
+    parser.add_argument(
+        "--language-code",
+        default=DEFAULT_LANGUAGE_CODE,
+        help="ISO 639-3 code of the MMS-TTS base checkpoint to fine-tune (facebook/mms-tts-<code>)",
+    )
+    parser.add_argument(
+        "--base-checkpoint",
+        default=None,
+        help=(
+            "Path or Hub repo id of an already discriminator-equipped base checkpoint. "
+            "If unset, one is built once from --language-code and cached under "
+            "finetune_hf_vits/mms-tts-<language-code>-train/"
+        ),
     )
     parser.add_argument("--dataset", default=DEFAULT_DATASET, help="HF dataset repo id (raw audio + text)")
-    parser.add_argument("--split", default=DEFAULT_SPLIT)
     parser.add_argument("--audio-column", default=DEFAULT_AUDIO_COLUMN)
     parser.add_argument("--text-column", default=DEFAULT_TEXT_COLUMN)
-    parser.add_argument("--sample-rate", type=int, default=DEFAULT_SAMPLE_RATE)
+    parser.add_argument(
+        "--sample-text",
+        default=DEFAULT_SAMPLE_TEXT,
+        help="Text synthesized as an audio preview during eval",
+    )
+    parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
     parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="Only materialize/train on the first N examples (quick smoke tests, e.g. on a Mac)",
+        help="Cap training samples for a quick smoke test (sets max_train_samples)",
     )
-    parser.add_argument(
-        "--data-dir",
-        default=DEFAULT_DATA_DIR,
-        help="Where to materialize the dataset as wavs/+metadata.csv (VITS' trainer reads from disk, not HF Dataset objects)",
-    )
-    parser.add_argument(
-        "--skip-materialize",
-        action="store_true",
-        help="Reuse an already-materialized --data-dir instead of re-downloading/re-decoding audio",
-    )
-
-    parser.add_argument("--output-path", default=DEFAULT_OUTPUT_PATH)
-    parser.add_argument("--run-name", default=DEFAULT_RUN_NAME)
-    parser.add_argument("--eval-split-size", type=float, default=0.1)
+    parser.add_argument("--eval-samples", type=int, default=25, help="Number of held-out eval samples")
     parser.add_argument("--batch-size", type=int, default=16)
-    parser.add_argument("--eval-batch-size", type=int, default=8)
-    parser.add_argument("--num-loader-workers", type=int, default=4)
-    parser.add_argument("--epochs", type=int, default=1000)
-    parser.add_argument("--save-step", type=int, default=1000)
-    parser.add_argument("--print-step", type=int, default=25)
+    parser.add_argument("--eval-batch-size", type=int, default=16)
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--learning-rate", type=float, default=2e-5)
+    parser.add_argument("--eval-steps", type=int, default=50)
     parser.add_argument(
-        "--restore-path",
-        default="",
-        help="Path or URL to an existing VITS checkpoint to continue from (transfer learning); default trains from scratch",
-    )
-    parser.add_argument(
-        "--mixed-precision",
-        action="store_true",
-        default=torch.cuda.is_available(),
-        help="Defaults to on when a CUDA GPU is available, off otherwise (unsupported on CPU)",
+        "--fp16",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Defaults to on when a CUDA GPU is available, off otherwise",
     )
 
     parser.add_argument(
         "--push-to-hub",
         action="store_true",
-        help="Push the trained run (checkpoints + config) to the Hub (needs HF_TOKEN, e.g. via a .env file)",
+        help="Push the finetuned model to the Hub (needs HF_TOKEN, e.g. via a .env file)",
     )
     parser.add_argument(
         "--hub-repo-id",
-        help="Target model repo id, e.g. 'myorg/vits-quechua'. Required with --push-to-hub",
+        default=DEFAULT_HUB_REPO_ID,
+        help="Target model repo id. Defaults to '$HF_USERNAME/vits-quechua'",
     )
     parser.add_argument("--private", action="store_true", help="Create the Hub repo as private")
 
@@ -97,151 +96,99 @@ def parse_args():
     return args
 
 
-def materialize_dataset(dataset_name, split, audio_column, text_column, sample_rate, data_dir, limit):
-    wavs_dir = os.path.join(data_dir, "wavs")
-    os.makedirs(wavs_dir, exist_ok=True)
-
-    print(f"Loading raw dataset ({dataset_name}, split={split})...")
-    dataset = load_dataset(dataset_name, split=split)
-    if limit:
-        dataset = dataset.select(range(min(limit, len(dataset))))
-    dataset = dataset.cast_column(audio_column, Audio(decode=False))
-
-    print(f"Decoding {len(dataset)} clips, resampling to {sample_rate}Hz, writing wavs + metadata.csv...")
-    texts = []
-    metadata_path = os.path.join(data_dir, "metadata.csv")
-    with open(metadata_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f, delimiter="|", quoting=csv.QUOTE_NONE, escapechar="\\")
-        for i, row in enumerate(dataset):
-            audio = row[audio_column]
-            source = io.BytesIO(audio["bytes"]) if audio.get("bytes") else audio["path"]
-            array, sr = sf.read(source, dtype="float32")
-            if array.ndim > 1:
-                array = array.mean(axis=1)
-            if sr != sample_rate:
-                array = librosa.resample(array, orig_sr=sr, target_sr=sample_rate)
-
-            utt_id = f"quy_{i:05d}"
-            sf.write(os.path.join(wavs_dir, f"{utt_id}.wav"), array, sample_rate)
-
-            text = row[text_column]
-            writer.writerow([utt_id, text, text])
-            texts.append(text)
-
-    return texts
-
-
-def build_characters_config(texts):
-    letters = set()
-    punctuations = set()
-    for text in texts:
-        for ch in text:
-            if ch == " ":
-                continue
-            if ch.isalpha():
-                letters.add(ch)
-            else:
-                punctuations.add(ch)
-    return CharactersConfig(
-        characters_class="TTS.tts.utils.text.characters.Graphemes",
-        characters="".join(sorted(letters)),
-        punctuations="".join(sorted(punctuations)) + " ",
-        pad="<PAD>",
-        eos="<EOS>",
-        bos="<BOS>",
-        blank="<BLNK>",
+def ensure_monotonic_align_built():
+    if glob.glob(os.path.join(MONOTONIC_ALIGN_DIR, "*.so")):
+        return
+    print("Building the monotonic_align Cython extension (one-time)...")
+    os.makedirs(os.path.join(MONOTONIC_ALIGN_DIR, "monotonic_align"), exist_ok=True)
+    subprocess.run(
+        [sys.executable, "setup.py", "build_ext", "--inplace"],
+        cwd=MONOTONIC_ALIGN_DIR,
+        check=True,
     )
+
+
+def ensure_base_checkpoint(language_code):
+    checkpoint_dir = os.path.join(FINETUNE_DIR, f"mms-tts-{language_code}-train")
+    if os.path.isdir(checkpoint_dir):
+        return checkpoint_dir
+    print(f"Building the discriminator-equipped base checkpoint for '{language_code}' (one-time)...")
+    subprocess.run(
+        [
+            sys.executable,
+            CONVERT_SCRIPT,
+            "--language_code",
+            language_code,
+            "--pytorch_dump_folder_path",
+            checkpoint_dir,
+        ],
+        check=True,
+    )
+    return checkpoint_dir
 
 
 def main():
-    load_dotenv()
     args = parse_args()
-    print(f"CUDA available: {torch.cuda.is_available()}")
 
-    dataset_config = BaseDatasetConfig(
-        formatter="ljspeech",
-        meta_file_train="metadata.csv",
-        path=args.data_dir,
-    )
+    ensure_monotonic_align_built()
+    base_checkpoint = args.base_checkpoint or ensure_base_checkpoint(args.language_code)
 
-    if args.skip_materialize:
-        print(f"Reusing already-materialized dataset at {args.data_dir}...")
-        with open(os.path.join(args.data_dir, "metadata.csv"), encoding="utf-8") as f:
-            texts = [line.split("|", 2)[1] for line in f if line.strip()]
-    else:
-        texts = materialize_dataset(
-            args.dataset,
-            args.split,
-            args.audio_column,
-            args.text_column,
-            args.sample_rate,
-            args.data_dir,
-            args.limit,
-        )
+    config = {
+        "project_name": f"{args.language_code}_vits_finetuning",
+        "output_dir": args.output_dir,
+        "overwrite_output_dir": True,
+        "report_to": [],
+        "dataset_name": args.dataset,
+        "audio_column_name": args.audio_column,
+        "text_column_name": args.text_column,
+        # The parallel dataset only has a "train" split; reuse it for eval too.
+        "train_split_name": "train",
+        "eval_split_name": "train",
+        "full_generation_sample_text": args.sample_text,
+        "max_duration_in_seconds": 20,
+        "min_duration_in_seconds": 1.0,
+        "max_tokens_length": 500,
+        "model_name_or_path": base_checkpoint,
+        "preprocessing_num_workers": 4,
+        "do_train": True,
+        "num_train_epochs": args.epochs,
+        "per_device_train_batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "adam_beta1": 0.8,
+        "adam_beta2": 0.99,
+        "do_eval": True,
+        "eval_steps": args.eval_steps,
+        "per_device_eval_batch_size": args.eval_batch_size,
+        "max_eval_samples": args.eval_samples,
+        "do_step_schedule_per_epoch": True,
+        "weight_disc": 3,
+        "weight_fmaps": 1,
+        "weight_gen": 1,
+        "weight_kl": 1.5,
+        "weight_duration": 1,
+        "weight_mel": 35,
+        "fp16": args.fp16,
+        "seed": 456,
+    }
+    if config["fp16"] is None:
+        import torch
 
-    characters_config = build_characters_config(texts)
-    sample_sentences = [[t] for t in texts[:3]] or VitsConfig().test_sentences
-
-    config = VitsConfig(
-        run_name=args.run_name,
-        output_path=args.output_path,
-        audio=VitsAudioConfig(sample_rate=args.sample_rate),
-        datasets=[dataset_config],
-        batch_size=args.batch_size,
-        eval_batch_size=args.eval_batch_size,
-        num_loader_workers=args.num_loader_workers,
-        num_eval_loader_workers=args.num_loader_workers,
-        epochs=args.epochs,
-        save_step=args.save_step,
-        print_step=args.print_step,
-        eval_split_size=args.eval_split_size,
-        use_phonemes=False,  # no reliable Quechua phonemizer backend; train on raw graphemes instead
-        characters=characters_config,
-        compute_input_seq_cache=True,
-        print_eval=False,
-        mixed_precision=args.mixed_precision,
-        test_sentences=sample_sentences,
-    )
-
-    print("Building audio processor and tokenizer...")
-    ap = AudioProcessor.init_from_config(config)
-    tokenizer, config = TTSTokenizer.init_from_config(config)
-
-    print("Loading samples...")
-    train_samples, eval_samples = load_tts_samples(
-        dataset_config,
-        eval_split=True,
-        eval_split_size=config.eval_split_size,
-    )
-    print(f"{len(train_samples)} train samples, {len(eval_samples)} eval samples")
-
-    model = Vits(config, ap, tokenizer, speaker_manager=None)
-
-    trainer = Trainer(
-        TrainerArgs(restore_path=args.restore_path),
-        config,
-        args.output_path,
-        model=model,
-        train_samples=train_samples,
-        eval_samples=eval_samples,
-        parse_command_line_args=False,
-    )
-
-    print("Training...")
-    trainer.fit()
-
+        config["fp16"] = torch.cuda.is_available()
+    if args.limit:
+        config["max_train_samples"] = args.limit
     if args.push_to_hub:
-        print(f"Pushing run ({trainer.output_path}) to the Hub ({args.hub_repo_id})...")
-        api = HfApi()
-        api.create_repo(args.hub_repo_id, repo_type="model", private=args.private, exist_ok=True)
-        api.upload_folder(
-            repo_id=args.hub_repo_id,
-            folder_path=str(trainer.output_path),
-            repo_type="model",
-            allow_patterns=["*.pth", "*.json", "*.txt"],
-        )
+        config["push_to_hub"] = True
+        config["hub_model_id"] = args.hub_repo_id
+        config["hub_private_repo"] = args.private
 
-    print("Done! TTS model is ready.")
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(config, f, indent=2)
+        config_path = f.name
+
+    print(f"Training config written to {config_path}:")
+    print(json.dumps(config, indent=2))
+
+    subprocess.run([sys.executable, TRAIN_SCRIPT, config_path], check=True)
 
 
 if __name__ == "__main__":

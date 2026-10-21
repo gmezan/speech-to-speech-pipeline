@@ -1,1 +1,1 @@
-uv run main.py --push-to-hub --hub-repo-id gmezan/quechua-whisper-ready
+uv run main.py --push-to-hub

@@ -1,4 +1,5 @@
 import argparse
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
@@ -13,11 +14,15 @@ from transformers import (
     WhisperProcessor,
 )
 
-DEFAULT_DATASET = "gmezan/quechua-whisper-ready"
+load_dotenv()
+
+HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
+DEFAULT_DATASET = f"{HF_USERNAME}/quechua-whisper-ready"
 DEFAULT_SPLIT = "train"
 DEFAULT_EVAL_SIZE = 0.1
 DEFAULT_MODEL = "openai/whisper-small"
 DEFAULT_OUTPUT_DIR = "./whisper-stt-lora"
+DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/whisper-quechua"
 
 
 def parse_args():
@@ -75,7 +80,8 @@ def parse_args():
     )
     parser.add_argument(
         "--hub-repo-id",
-        help="Target model repo id, e.g. 'myorg/whisper-quechua'. Required with --push-to-hub",
+        default=DEFAULT_HUB_REPO_ID,
+        help="Target model repo id. Defaults to '$HF_USERNAME/whisper-quechua'",
     )
     parser.add_argument("--private", action="store_true", help="Create the Hub repo as private")
 
@@ -113,7 +119,6 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 
 
 def main():
-    load_dotenv()
     args = parse_args()
     device = pick_device()
     print(f"Device: {device}")

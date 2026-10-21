@@ -1,24 +1,63 @@
 # tts
 
-Fine-tunes a VITS text-to-speech model on the Quechua speech corpus, using
-[Coqui TTS](https://github.com/idiap/coqui-ai-TTS) (`coqui-tts` — the
-maintained fork of the library already used for inference in
-`tmp_stt_tts/app.py`/`app_trained.py`).
+Fine-tunes [Meta's MMS-TTS](https://huggingface.co/facebook/mms-tts) VITS
+checkpoint for Quechua — [`facebook/mms-tts-quy`](https://huggingface.co/facebook/mms-tts-quy),
+the exact Ayacucho/Chanka Quechua variant our data is in — on the Quechua
+speech corpus. Training uses a vendored copy of
+[`ylacombe/finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits)
+(MIT licensed, see [`finetune_hf_vits/LICENSE`](./finetune_hf_vits/LICENSE)),
+since plain `transformers` ships VITS for inference only — it has no
+training/discriminator support (`VitsModel.forward` raises
+`NotImplementedError` if you pass `labels`). `finetune_hf_vits/` reimplements
+the VITS generator+discriminator GAN training loop around the same
+`transformers` checkpoint format, using `accelerate`.
 
-## Same corpus as `stt/`, different shape
+## Why not Coqui, why not LoRA
 
-This is the **same underlying Quechua speech corpus** `stt/` trains on
-([`josemercado/quechua-chanka-asr`](https://huggingface.co/datasets/josemercado/quechua-chanka-asr)),
-but pulled in its **raw** form — waveform + plain transcript — rather than
-the Whisper-preprocessed form `preprocessing/` produces
-(`gmezan/quechua-whisper-ready`, `input_features`/`labels`).
+Earlier iterations of this module tried training VITS from scratch with
+Coqui TTS, then considered LoRA. Neither fit:
 
-That preprocessed dataset can't be reused here: it strips the raw audio
-entirely and tokenizes text against Whisper's vocabulary, which is specific
-to ASR (see `preprocessing/docs/output-schema.md`'s "One output directory
-per language/task" section). TTS needs the opposite direction — raw
-waveform as the *target*, plain text as the *input* — so `tts/main.py`
-loads the raw dataset directly instead of going through `preprocessing/`.
+- **From scratch** needs far more data/steps than our ~500-clip corpus can
+  support, and ignores a pretrained checkpoint that already exists for this
+  exact language.
+- **LoRA** doesn't have clean target modules on VITS's
+  convolutional/flow architecture the way it does on a transformer like
+  Whisper, and no LoRA-ready Quechua VITS checkpoint exists to build on.
+
+Fine-tuning the real `facebook/mms-tts-quy` checkpoint is the better fit:
+purpose-built for this language, and the toolkit's own benchmark claims a
+good result in "20 minutes with as little as 80 to 150 samples" — well within
+what our corpus provides. Caveat: MMS checkpoints are
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial)
+— any finetuned model inherits that license.
+
+## Same corpus as `stt/`, raw form
+
+Like `stt/`, this trains on the same Quechua speech corpus
+([`gmezan/quechua-spanish-parallel`](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel),
+`text_quy`/`audio_quy` columns — see
+[dataset-schema.md](../preprocessing/docs/dataset-schema.md)),
+pulled in its raw form (audio + transcript), not the Whisper-preprocessed
+form `preprocessing/` produces — that one strips raw audio and tokenizes
+against Whisper's vocab, which only serves ASR.
+
+## Setup
+
+```sh
+uv sync
+```
+
+`main.py` handles the two one-time setup steps itself on first run — no
+manual steps needed:
+
+1. **Build the `monotonic_align` Cython extension** (native, platform-specific,
+   not committed — rebuilds automatically on a new machine, e.g. the GPU box).
+2. **Build the discriminator-equipped base checkpoint** for `--language-code`
+   (default `quy`): `facebook/mms-tts-quy` ships generator-only (inference
+   needs no discriminator); fine-tuning needs one. This downloads the
+   original discriminator weights from `facebook/mms-tts` and merges them
+   with the HF generator, caching the result at
+   `finetune_hf_vits/mms-tts-quy-train/` (gitignored, ~300MB).
 
 ## Usage
 
@@ -26,85 +65,86 @@ loads the raw dataset directly instead of going through `preprocessing/`.
 uv run main.py
 ```
 
-This pulls `--dataset` (default `josemercado/quechua-chanka-asr`, split
-`train`), decodes and resamples every clip to `--sample-rate` (default
-22050Hz, VITS' standard), and materializes it on disk as a LJSpeech-style
-manifest under `--data-dir` (default `./tts_data/wavs/*.wav` +
-`./tts_data/metadata.csv`) — Coqui's trainer reads from disk, not from an
-in-memory HF `Dataset`. It then builds a VITS config, a *grapheme*-based
-tokenizer sized from whatever characters actually appear in the transcripts
-(Quechua/Spanish text — ñ, á, í, apostrophes for ejectives, etc. — not the
-plain-English A–Z default), and trains with Coqui's `Trainer`.
+Pulls `--dataset` (default `gmezan/quechua-spanish-parallel`), fine-tunes for
+`--epochs` (default 200), and saves the final model to `--output-dir`
+(default `./vits-quy-finetuned`) — a plain `transformers.VitsModel` repo,
+no PEFT/Coqui/vendored-code dependency needed to use it afterward.
 
-Already materialized `--data-dir` from a previous run? Skip re-downloading
-and re-decoding audio:
+For a quick correctness check instead of a real run:
 
 ```sh
-uv run main.py --skip-materialize --data-dir ./tts_data
+uv run main.py --limit 8 --batch-size 2 --eval-batch-size 2 --epochs 1 --eval-steps 2
 ```
 
-For a quick correctness check instead of a real run, cap the dataset size:
+Run `uv run main.py --help` for the full list of options.
+
+## Pushing to the Hub
 
 ```sh
-uv run main.py --limit 16 --batch-size 2 --eval-batch-size 2 --epochs 1 \
-  --print-step 1 --save-step 100000
+uv run main.py --push-to-hub
 ```
 
-Run `uv run main.py --help` for the full list of options (LoRA-equivalent
-knobs here are VITS/trainer settings: batch size, epochs, save/print steps,
-eval split size, `--restore-path` to continue from an existing checkpoint
-instead of training from scratch).
+`--hub-repo-id` defaults to `$HF_USERNAME/vits-quechua` (override with
+`--hub-repo-id` directly if needed). Add `--private` to create the repo as
+private. Needs write access via `HF_TOKEN` (see below). Remember the
+finetuned model inherits MMS's non-commercial license.
 
-## No phonemizer
-
-`use_phonemes=False` by default — training is grapheme-based (raw
-characters), because there's no reliable Quechua phonemizer backend for
-`espeak-ng`. The character set is derived automatically from the actual
-training transcripts each run, not hardcoded, so it adapts if the corpus
-changes (e.g. once the parallel Spanish text lands, see
-`preprocessing/docs/dataset-schema.md`).
-
-## Pushing the trained model to the Hub
-
-```sh
-uv run main.py --push-to-hub --hub-repo-id <your-username>/vits-quechua
-```
-
-Uploads the run's checkpoints + `config.json` (via `huggingface_hub`,
-skipping TensorBoard event logs). Add `--private` to create the repo as
-private. Needs write access via `HF_TOKEN` (see below).
-
-## Auth: `.env` + `HF_TOKEN`
+## Auth: `.env` + `HF_TOKEN`/`HF_USERNAME`
 
 A `.env` file already exists in this directory (gitignored via the repo's
 root `.gitignore`) with:
 
 ```
 HF_TOKEN=hf_...
+HF_USERNAME=<your-hf-username>
 ```
 
-`main.py` loads it automatically via `python-dotenv` at startup; both
-`datasets.load_dataset` and the Hub upload pick up `HF_TOKEN` from the
-environment with no explicit token argument needed.
+`main.py` loads it automatically via `python-dotenv` at startup; `HF_TOKEN`
+is also needed for the one-time base checkpoint build, which downloads from
+the Hub. `datasets.load_dataset`, the Hub push, and the checkpoint download
+all pick up `HF_TOKEN` from the environment with no explicit token argument
+needed; `HF_USERNAME` is read directly to build the default `--dataset`/
+`--hub-repo-id` values.
 
-## Device: Mac today, CUDA for real training
+## Device: works on Mac, faster on CUDA
 
-Coqui's `Trainer` only accelerates on CUDA or runs on CPU — unlike `stt/`'s
-Whisper fine-tuning (via `transformers`), it has no Apple `mps` backend. That
-means:
+Unlike the earlier Coqui-based approach, this toolkit runs via `accelerate`
+and works the same way on CPU, MPS, or CUDA — no code changes needed. `--fp16`
+defaults to on when a CUDA GPU is available, off otherwise (mixed precision
+isn't reliable on CPU/MPS). On this Mac that means CPU-only training — fine
+for the `--limit`-capped smoke test above, far too slow for a real run. On
+the Linux g5.xlarge box, just `uv sync` there and drop `--limit`.
 
-- **On this Mac**: training runs on CPU. Fine for the `--limit`-capped
-  smoke test above to confirm the pipeline works end-to-end; far too slow
-  for a real VITS run (GAN-style training over the full corpus).
-- **On a Linux box with an NVIDIA GPU**: same command, same code — just run
-  `uv sync` there and drop `--limit`. `--mixed-precision` defaults on
-  automatically when CUDA is available. This is "Pipeline 2" from the
-  project's CI/CD design: an ephemeral GPU instance pulls the raw dataset,
-  runs this script, and pushes the resulting model back to the Hub.
+## Compatibility patches
+
+`finetune_hf_vits/` was written against `transformers~=4.35`. A few things
+changed by `transformers` 5.x that this install uses (`stt/`/`preprocessing/`
+also use transformers 5.x, so this stays consistent rather than pinning an
+old version just for `tts/`):
+
+- `datasets`' built-in audio decoding now requires `torchcodec` (needs an
+  exact ffmpeg ABI match that isn't guaranteed across environments — the
+  same issue `preprocessing/` hit). Patched `run_vits_finetuning.py` to
+  decode audio manually via `soundfile`/`librosa` instead, same workaround
+  used elsewhere in this repo.
+- `TrainingArguments.logging_dir`/`group_by_length`/`overwrite_output_dir`
+  were removed upstream; re-added `group_by_length`/`overwrite_output_dir`
+  as fields on the script's own `VITSTrainingArguments`, and inlined a
+  default for `logging_dir`.
+- `PretrainedConfig`'s handling of `pad_token_id` changed; the vendored
+  `VitsConfig` now sets it explicitly rather than relying on the base class.
+- `VitsDiscriminator` never called `self.post_init()`, which newer
+  `transformers.PreTrainedModel.from_pretrained()` requires unconditionally.
+- `matplotlib`'s `FigureCanvasAgg.tostring_rgb()` was removed; alignment/
+  spectrogram preview plots now use `buffer_rgba()`.
+
+None of this changes the training math — see the diffs in
+`finetune_hf_vits/` for exact changes (it's vendored source, not a
+dependency, so they're plain edits, not a patch file).
 
 ## Verified
 
-`uv sync`, `--help`, the `--push-to-hub` validation error path, and a full
-tiny end-to-end run (`--limit 8`, 1 epoch, CPU) all succeed: materializes
-wavs + metadata, builds the character set, trains, evaluates, and saves a
-checkpoint.
+`uv sync`, `--help`, and a full tiny end-to-end run (`--limit 8`, 1 epoch,
+CPU) — one-time Cython build, one-time base checkpoint conversion, training
+with real GAN losses (disc/gen/kl/mel/duration/fmaps), mid-training and
+final validation, and a saved checkpoint — all succeed.

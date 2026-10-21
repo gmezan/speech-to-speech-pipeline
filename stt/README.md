@@ -7,8 +7,8 @@ the Hugging Face Hub instead of a local copy:
 (produced by [`preprocessing/`](../preprocessing)) → fine-tune → merged model
 pushed back to the Hub.
 
-This mirrors `preprocessing/`'s auth pattern: a local `.env` with `HF_TOKEN`,
-loaded automatically, no shell `export` needed.
+This mirrors `preprocessing/`'s auth pattern: a local `.env` with `HF_TOKEN`
+and `HF_USERNAME`, loaded automatically, no shell `export` needed.
 
 ## Usage
 
@@ -37,27 +37,31 @@ generation length).
 ## Pushing the trained model to the Hub
 
 ```sh
-uv run main.py --push-to-hub --hub-repo-id <your-username>/whisper-quechua
+uv run main.py --push-to-hub
 ```
 
-This merges the LoRA adapter into the base model (`merge_and_unload`) and
-pushes the full merged weights plus the processor — so downstream inference
-(or `tts`'s pipeline) can just `from_pretrained(repo_id)` with no PEFT
-dependency or separate adapter-loading step. Add `--private` to create the
-repo as private. Needs write access to that repo via `HF_TOKEN` (see below).
+`--hub-repo-id` defaults to `$HF_USERNAME/whisper-quechua` (override with
+`--hub-repo-id` directly if needed). This merges the LoRA adapter into the
+base model (`merge_and_unload`) and pushes the full merged weights plus the
+processor — so downstream inference (or `tts`'s pipeline) can just
+`from_pretrained(repo_id)` with no PEFT dependency or separate
+adapter-loading step. Add `--private` to create the repo as private. Needs
+write access to that repo via `HF_TOKEN` (see below).
 
-## Auth: `.env` + `HF_TOKEN`
+## Auth: `.env` + `HF_TOKEN`/`HF_USERNAME`
 
 A `.env` file already exists in this directory (gitignored via the repo's
 root `.gitignore`) with:
 
 ```
 HF_TOKEN=hf_...
+HF_USERNAME=<your-hf-username>
 ```
 
-`main.py` loads it automatically via `python-dotenv` at startup, and both
-`datasets.load_dataset` and `push_to_hub` pick up `HF_TOKEN` from the
-environment with no explicit token argument needed.
+`main.py` loads it automatically via `python-dotenv` at startup. `HF_TOKEN`
+is picked up by `datasets.load_dataset`/`push_to_hub` with no explicit
+token argument needed; `HF_USERNAME` is read directly to build the default
+`--dataset`/`--hub-repo-id` values.
 
 ## Device: Mac today, CUDA for real training
 
