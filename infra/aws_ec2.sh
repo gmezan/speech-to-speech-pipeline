@@ -48,6 +48,8 @@ INSTANCE_ID=$(aws ec2 run-instances \
         "EnableResourceNameDnsARecord": true,
         "EnableResourceNameDnsAAAARecord": false
     }' \
+    --user-data '#!/bin/bash
+sudo -u ubuntu -i -- bash -c "curl -LsSf https://astral.sh/uv/install.sh | sh"' \
     --query 'Instances[0].InstanceId' \
     --output text)
 
@@ -60,3 +62,5 @@ PUBLIC_IP=$(aws ec2 describe-instances \
     --output text)
 
 echo "Instance $INSTANCE_ID is running. Public IP: $PUBLIC_IP"
+echo "Note: --user-data (installing uv) runs in the background after boot;"
+echo "give it a few seconds after SSH'ing in before 'source \$HOME/.local/bin/env'."

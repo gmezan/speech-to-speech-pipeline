@@ -1,6 +1,6 @@
 ssh -i *.pem ubuntu@<instance_public_ip>
 
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# uv is already installed via aws_ec2.sh's --user-data; just load it into this shell.
 source $HOME/.local/bin/env
 
 git clone https://github.com/gmezan/speech-to-speech-pipeline.git

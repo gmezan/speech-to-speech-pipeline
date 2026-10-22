@@ -68,7 +68,11 @@ back to the untuned `facebook/mms-tts-quy` baseline.
 
 Gradio UI to manually test STT (`gmezan/whisper-quechua`) and TTS
 (`facebook/mms-tts-quy`, baseline) **in isolation** — there is no speech ↔
-speech wiring between them yet (see below).
+speech wiring between them yet (see below). Both are Quechua-only, despite
+`--language spanish` being a Whisper decoder-token anchor, not a sign of
+Spanish training data — for real Spanish STT/TTS use the base
+`openai/whisper-small`/`facebook/mms-tts-spa` instead (see
+[`app/README.md`](./app/README.md#quechua-only--these-models-do-not-do-spanish)).
 
 ### 6. [`evaluation/`](./evaluation) — WER/CER
 
@@ -84,6 +88,18 @@ Hub like everything else:
   WER/CER against the original text. Bounded by the judge model's own error
   rate, and not a naturalness/MOS score — real perceptual quality still
   needs human eval, out of scope here.
+
+### 7. [`nlp/`](./nlp) — translation
+
+[`translation/`](./nlp/translation) LoRA fine-tunes
+`facebook/nllb-200-distilled-600M` — a single many-to-many model, not one
+per direction — on `text_quy`/`text_spa` to translate both Quechua→Spanish
+and Spanish→Quechua. Code is wired up and ready, but blocked on the same
+missing Spanish corpus as above, so it hasn't been run for real yet.
+
+See [`docs/hardware-requirements.md`](./docs/hardware-requirements.md) for
+disk/RAM/GPU sizing per model and variant, plus Quechua-only vs.
+both-languages deployment totals.
 
 ### [`infra/`](./infra) — training compute
 
@@ -107,6 +123,9 @@ and running `stt/`'s and `tts/`'s `--push-to-hub` commands there for real
 - Standalone playground (`app/`) to manually exercise STT and TTS.
 - WER/CER evaluation (`evaluation/`) for both the STT model directly and the
   TTS model via round-trip intelligibility.
+- Translation (`nlp/translation/`) scaffolded: LoRA fine-tune of
+  `facebook/nllb-200-distilled-600M` for both Quechua↔Spanish directions in
+  one model, plus a CLI to test it. Not run yet — needs the Spanish corpus.
 
 ## What's left
 
@@ -123,11 +142,11 @@ and running `stt/`'s and `tts/`'s `--push-to-hub` commands there for real
 - **Wire `app/` into an actual speech-to-speech pipeline**: today STT and TTS
   are tested independently; there's no Quechua-audio-in →
   transcribe → (translate) → synthesize → Spanish/Quechua-audio-out flow.
-- **Translation — undecided.** `nlp/` is scaffolded but empty pending a call
-  on whether this pipeline needs a translation step at all, or stays
-  Quechua-only end-to-end. If it turns out to be needed, the plan is an
-  open-weight MT model fine-tuned on `text_quy`/`text_spa` (once the Spanish
-  side above is collected) rather than training one from scratch.
+- **Run the translation fine-tune.** `nlp/translation/` (NLLB-200,
+  LoRA, both directions in one model) is built and ready but has never
+  been run for real — it's blocked on the same missing Spanish corpus as
+  above. Whether this pipeline ends up using it at all (vs. staying
+  Quechua-only end-to-end) is still an open call.
 - **No perceptual TTS quality score.** `evaluation/eval_tts.py` gives an
   automatic intelligibility proxy, not naturalness/MOS — that still needs
   human evaluation if it matters for this project.
