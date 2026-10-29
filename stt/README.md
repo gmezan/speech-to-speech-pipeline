@@ -16,13 +16,17 @@ and `HF_USERNAME`, loaded automatically, no shell `export` needed.
 uv run main.py
 ```
 
-This pulls `--dataset` (default `gmezan/quechua-whisper-ready`, split
-`train`), holds out `--eval-size` (default 10%) for eval, LoRA-fine-tunes
-`--model` (default `openai/whisper-small`) for `--max-steps` (default 500),
-and saves the adapter to `<output-dir>-adapter` (default
-`./whisper-stt-lora-adapter`, derived from `--output-dir`, default
-`./whisper-stt-lora`). Nothing is trained from or saved to a dataset file on
-disk — only the Hub repo id matters.
+This pulls `--dataset` (default `gmezan/quechua-whisper-ready`), trains on
+`--train-split` (default `train`) and validates on `--validation-split`
+(default `validation`) — native splits fixed at the data level (see
+`preprocessing/scripts/assign_splits.py`), shared with `nlp/translation/` and
+`tts/`, so `test` is never loaded here and stays a clean benchmark for
+`evaluation/eval_stt.py`. LoRA-fine-tunes `--model` (default
+`openai/whisper-small`) for `--max-steps` (default 500), and saves the
+adapter to `<output-dir>-adapter` (default `./whisper-stt-lora-adapter`,
+derived from `--output-dir`, default `./whisper-stt-lora`). Nothing is
+trained from or saved to a dataset file on disk — only the Hub repo id
+matters.
 
 Override anything via flags, e.g. for a longer run on a bigger box:
 

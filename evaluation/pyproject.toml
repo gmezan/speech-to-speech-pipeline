@@ -1,7 +1,7 @@
 [project]
 name = "evaluation"
 version = "0.1.0"
-description = "WER/CER evaluation for the stt/ and tts/ models"
+description = "WER/CER evaluation for stt/ and tts/, BLEU/chrF++ for nlp/ translation"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -9,6 +9,7 @@ dependencies = [
     "jiwer>=3.0.0",
     "librosa>=0.11.0",
     "python-dotenv>=1.0.0",
+    "sacrebleu>=2.4.0",
     "soundfile>=0.14.0",
     "torch>=2.4.0",
     "transformers>=5.17.0",

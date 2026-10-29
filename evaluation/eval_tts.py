@@ -19,24 +19,23 @@ load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
-DEFAULT_SPLIT = "train"
+DEFAULT_SPLIT = "test"
 DEFAULT_TEXT_COLUMN = "text_quy"
 # facebook/mms-tts-quy until tts/ pushes a fine-tuned f"{HF_USERNAME}/vits-quechua"
 DEFAULT_TTS_MODEL = "facebook/mms-tts-quy"
 DEFAULT_STT_MODEL = f"{HF_USERNAME}/whisper-quechua"
-DEFAULT_EVAL_SIZE = 0.1
-DEFAULT_SEED = 42
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Evaluate a TTS model via round-trip intelligibility: synthesize "
-            "audio for each eval-split text, transcribe it with the fine-tuned "
-            "STT model, and score WER/CER against the original text. This is "
-            "an automatic intelligibility proxy, not a naturalness/MOS score "
-            "(see README) — and it's bounded by the judge STT model's own "
-            "error rate, not a pure TTS metric."
+            "audio for each --split text (native 'test' by default -- see "
+            "preprocessing/scripts/assign_splits.py), transcribe it with the "
+            "fine-tuned STT model, and score WER/CER against the original "
+            "text. This is an automatic intelligibility proxy, not a "
+            "naturalness/MOS score (see README) — and it's bounded by the "
+            "judge STT model's own error rate, not a pure TTS metric."
         )
     )
     parser.add_argument("--dataset", default=DEFAULT_DATASET)
@@ -49,18 +48,6 @@ def parse_args():
         default="spanish",
         help="Whisper decoder language anchor for the judge model; must match what stt/ fine-tuned with",
     )
-    parser.add_argument(
-        "--eval-size",
-        type=float,
-        default=DEFAULT_EVAL_SIZE,
-        help="Must match stt/main.py's --eval-size so text comes from the same held-out rows",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=DEFAULT_SEED,
-        help="Must match stt/main.py's --seed so text comes from the same held-out rows",
-    )
     parser.add_argument("--limit", type=int, default=None, help="Cap eval rows for a quick smoke test")
     return parser.parse_args()
 
@@ -70,10 +57,9 @@ def load_eval_texts(args):
     # Text-only: avoids decoding the audio columns (not needed here, and
     # requires torchcodec which isn't guaranteed to be installed).
     dataset = dataset.select_columns([args.text_column])
-    eval_dataset = dataset.train_test_split(test_size=args.eval_size, seed=args.seed)["test"]
     if args.limit:
-        eval_dataset = eval_dataset.select(range(min(args.limit, len(eval_dataset))))
-    return [row[args.text_column] for row in eval_dataset if row[args.text_column] and row[args.text_column].strip()]
+        dataset = dataset.select(range(min(args.limit, len(dataset))))
+    return [row[args.text_column] for row in dataset if row[args.text_column] and row[args.text_column].strip()]
 
 
 def main():

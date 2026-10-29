@@ -4,7 +4,7 @@ import os
 
 import librosa
 import soundfile as sf
-from datasets import Audio, load_dataset
+from datasets import Audio, DatasetDict, load_dataset
 from dotenv import load_dotenv
 from transformers import WhisperProcessor
 
@@ -12,7 +12,6 @@ load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
-DEFAULT_SPLIT = "train"
 DEFAULT_AUDIO_COLUMN = "audio_quy"
 DEFAULT_TEXT_COLUMN = "text_quy"
 DEFAULT_MODEL = "openai/whisper-small"
@@ -23,10 +22,16 @@ SAMPLING_RATE = 16000
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Prepare a Quechua ASR dataset for Whisper fine-tuning."
+        description=(
+            "Prepare a Quechua ASR dataset for Whisper fine-tuning. Processes "
+            "every native split (train/validation/test) the source dataset "
+            "has -- see preprocessing/scripts/assign_splits.py -- and "
+            "preserves those same split names in the output, so stt/main.py "
+            "and evaluation/eval_stt.py can read train/validation/test "
+            "directly instead of re-deriving a split here."
+        )
     )
     parser.add_argument("--dataset", default=DEFAULT_DATASET, help="HF dataset repo id")
-    parser.add_argument("--split", default=DEFAULT_SPLIT)
     parser.add_argument("--audio-column", default=DEFAULT_AUDIO_COLUMN)
     parser.add_argument("--text-column", default=DEFAULT_TEXT_COLUMN)
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Whisper checkpoint to size the processor")
@@ -86,18 +91,22 @@ def main():
         args.model, language=args.language, task=args.task
     )
 
-    print(f"2. Loading dataset ({args.dataset}, split={args.split})...")
-    dataset = load_dataset(args.dataset, split=args.split)
+    print(f"2. Loading dataset ({args.dataset}, all splits)...")
+    dataset = load_dataset(args.dataset)
 
     print("3. Switching audio column to raw (undecoded) bytes...")
     dataset = dataset.cast_column(args.audio_column, Audio(decode=False))
 
-    print(f"4. Decoding audio, resampling to {SAMPLING_RATE}Hz, extracting features, and tokenizing labels...")
-    prepared_dataset = dataset.map(
-        build_prepare_fn(processor, args.audio_column, args.text_column),
-        remove_columns=dataset.column_names,
-        num_proc=args.num_proc,
+    print(f"4. Decoding audio, resampling to {SAMPLING_RATE}Hz, extracting features, and tokenizing labels (per split)...")
+    prepare_fn = build_prepare_fn(processor, args.audio_column, args.text_column)
+    prepared_dataset = DatasetDict(
+        {
+            split_name: split.map(prepare_fn, remove_columns=split.column_names, num_proc=args.num_proc)
+            for split_name, split in dataset.items()
+        }
     )
+    for split_name, split in prepared_dataset.items():
+        print(f"   {split_name}: {len(split)} rows")
 
     print(f"5. Saving processed dataset to {args.output_dir}...")
     prepared_dataset.save_to_disk(args.output_dir)

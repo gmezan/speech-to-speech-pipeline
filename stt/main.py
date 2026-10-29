@@ -18,8 +18,8 @@ load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-whisper-ready"
-DEFAULT_SPLIT = "train"
-DEFAULT_EVAL_SIZE = 0.1
+DEFAULT_TRAIN_SPLIT = "train"
+DEFAULT_VALIDATION_SPLIT = "validation"
 DEFAULT_MODEL = "openai/whisper-small"
 DEFAULT_OUTPUT_DIR = "./whisper-stt-lora"
 DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/whisper-quechua"
@@ -29,7 +29,11 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Fine-tune Whisper (LoRA) on a training-ready ASR dataset pulled "
-            "straight from the Hugging Face Hub."
+            "straight from the Hugging Face Hub. Trains on --train-split and "
+            "validates on --validation-split -- native splits fixed at the "
+            "data level (see preprocessing/scripts/assign_splits.py), shared "
+            "with translation/ and tts/, so 'test' is never loaded here and "
+            "stays a clean benchmark for evaluation/eval_stt.py."
         )
     )
     parser.add_argument(
@@ -37,13 +41,8 @@ def parse_args():
         default=DEFAULT_DATASET,
         help="HF dataset repo id produced by preprocessing/main.py (input_features/labels columns)",
     )
-    parser.add_argument("--split", default=DEFAULT_SPLIT)
-    parser.add_argument(
-        "--eval-size",
-        type=float,
-        default=DEFAULT_EVAL_SIZE,
-        help="Fraction of --split held out for eval; 0 reuses the train set as eval",
-    )
+    parser.add_argument("--train-split", default=DEFAULT_TRAIN_SPLIT)
+    parser.add_argument("--validation-split", default=DEFAULT_VALIDATION_SPLIT)
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Base Whisper checkpoint")
     parser.add_argument(
         "--language",
@@ -123,13 +122,10 @@ def main():
     device = pick_device()
     print(f"Device: {device}")
 
-    print(f"1. Loading training-ready dataset ({args.dataset}, split={args.split})...")
-    dataset = load_dataset(args.dataset, split=args.split)
-    if args.eval_size > 0:
-        split_dataset = dataset.train_test_split(test_size=args.eval_size, seed=args.seed)
-        train_dataset, eval_dataset = split_dataset["train"], split_dataset["test"]
-    else:
-        train_dataset, eval_dataset = dataset, dataset
+    print(f"1. Loading training-ready dataset ({args.dataset})...")
+    train_dataset = load_dataset(args.dataset, split=args.train_split)
+    eval_dataset = load_dataset(args.dataset, split=args.validation_split)
+    print(f"   {len(train_dataset)} train rows, {len(eval_dataset)} validation rows")
 
     print(f"2. Loading Whisper processor and base model ({args.model})...")
     processor = WhisperProcessor.from_pretrained(args.model, language=args.language, task=args.task)
@@ -162,6 +158,7 @@ def main():
         save_steps=args.save_steps,
         eval_strategy="steps",
         eval_steps=args.eval_steps,
+        seed=args.seed,
         predict_with_generate=True,
         generation_max_length=args.generation_max_length,
         remove_unused_columns=False,  # dataset columns are input_features/labels, not model kwarg names

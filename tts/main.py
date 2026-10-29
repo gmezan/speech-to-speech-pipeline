@@ -141,9 +141,11 @@ def main():
         "dataset_name": args.dataset,
         "audio_column_name": args.audio_column,
         "text_column_name": args.text_column,
-        # The parallel dataset only has a "train" split; reuse it for eval too.
+        # Native splits shared with stt/ and translation/ (see
+        # preprocessing/scripts/assign_splits.py); "test" is reserved for
+        # evaluation/eval_tts.py and never loaded here.
         "train_split_name": "train",
-        "eval_split_name": "train",
+        "eval_split_name": "validation",
         "full_generation_sample_text": args.sample_text,
         "max_duration_in_seconds": 20,
         "min_duration_in_seconds": 1.0,

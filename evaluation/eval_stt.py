@@ -14,22 +14,20 @@ load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
-DEFAULT_SPLIT = "train"
+DEFAULT_SPLIT = "test"
 DEFAULT_AUDIO_COLUMN = "audio_quy"
 DEFAULT_TEXT_COLUMN = "text_quy"
 DEFAULT_MODEL = f"{HF_USERNAME}/whisper-quechua"
-DEFAULT_EVAL_SIZE = 0.1
-DEFAULT_SEED = 42
 SAMPLING_RATE = 16000
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Evaluate a fine-tuned Whisper STT model with WER/CER. Recovers "
-            "the same held-out split stt/main.py trained against (same "
-            "--eval-size/--seed, train_test_split over the same raw "
-            "dataset), so this measures generalization, not memorized rows."
+            "Evaluate a fine-tuned Whisper STT model with WER/CER. Loads the "
+            "native 'test' split (see preprocessing/scripts/assign_splits.py) "
+            "-- a fixed benchmark stt/main.py never trains or validates "
+            "against, so this measures generalization, not memorized rows."
         )
     )
     parser.add_argument("--dataset", default=DEFAULT_DATASET, help="Raw HF dataset repo id (not the Whisper-ready one)")
@@ -43,18 +41,6 @@ def parse_args():
         help="Whisper decoder language anchor; must match what stt/ fine-tuned with",
     )
     parser.add_argument("--task", default="transcribe")
-    parser.add_argument(
-        "--eval-size",
-        type=float,
-        default=DEFAULT_EVAL_SIZE,
-        help="Must match stt/main.py's --eval-size so the recovered split lines up with training",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=DEFAULT_SEED,
-        help="Must match stt/main.py's --seed so the recovered split lines up with training",
-    )
     parser.add_argument("--limit", type=int, default=None, help="Cap eval rows for a quick smoke test")
     return parser.parse_args()
 
@@ -62,10 +48,9 @@ def parse_args():
 def load_eval_split(args):
     dataset = load_dataset(args.dataset, split=args.split)
     dataset = dataset.cast_column(args.audio_column, Audio(decode=False))
-    eval_dataset = dataset.train_test_split(test_size=args.eval_size, seed=args.seed)["test"]
     if args.limit:
-        eval_dataset = eval_dataset.select(range(min(args.limit, len(eval_dataset))))
-    return eval_dataset
+        dataset = dataset.select(range(min(args.limit, len(dataset))))
+    return dataset
 
 
 def decode_audio(raw_audio):

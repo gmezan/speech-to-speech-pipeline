@@ -40,10 +40,20 @@ fine-tune to need to close some dialect gap, not just a domain gap.
 uv run translation/train.py
 ```
 
-Pulls `--dataset` (default `$HF_USERNAME/quechua-spanish-parallel`),
-builds the bidirectional pair set from `--text-column-quy`/
-`--text-column-spa` (defaults `text_quy`/`text_spa`), holds out
-`--eval-size` (default 10%) for eval, LoRA-fine-tunes `--model` (default
+Pulls `--dataset` (default `$HF_USERNAME/quechua-spanish-parallel`), trains
+on `--train-split` (default `train`) and validates on `--validation-split`
+(default `validation`) — native HF splits, filtered to rows whose `source`
+starts with one of `--source-prefixes` (default `["americasnlp"]`, an
+explicit allow-list — currently only `americasnlp*` sources are cleaned of
+`<unk>`-inducing characters, see `preprocessing/scripts/clean_text.py` —
+rather than "everything with non-blank `text_spa`", so a future source
+doesn't get pulled into training just by having both languages populated),
+building the bidirectional pair set from `--text-column-quy`/
+`--text-column-spa` (defaults `text_quy`/`text_spa`) for each. These splits
+are fixed at the data level (see `preprocessing/scripts/assign_splits.py`,
+80/10/10 stratified by `source`), shared with `stt/` and `tts/`, not
+re-derived here, so `test` rows are never loaded by this script —
+`evaluation/eval_mt.py` scores those. LoRA-fine-tunes `--model` (default
 `facebook/nllb-200-distilled-600M`) for `--max-steps` (default 500), and
 saves the adapter to `<output-dir>-adapter`.
 

@@ -12,6 +12,33 @@ training/discriminator support (`VitsModel.forward` raises
 the VITS generator+discriminator GAN training loop around the same
 `transformers` checkpoint format, using `accelerate`.
 
+## Base model: `facebook/mms-tts-quy` + merged discriminator
+
+The base checkpoint is [`facebook/mms-tts-quy`](https://huggingface.co/facebook/mms-tts-quy)
+(Meta's MMS-TTS VITS for Ayacucho/Chanka Quechua). As published, it's
+**generator-only** — fine for inference, but VITS fine-tuning needs a
+generator+discriminator pair for the GAN training objective, and
+`facebook/mms-tts-quy` ships without one.
+
+For some languages, `ylacombe/finetune-hf-vits` (the toolkit this module
+vendors) publishes a ready-made `ylacombe/mms-tts-<lang>-train` checkpoint
+that already bundles a matching discriminator (e.g.
+`ylacombe/mms-tts-kor-train`, `ylacombe/mms-tts-guj-train` — see
+[`finetune_hf_vits/README.md`](./finetune_hf_vits/README.md)). **No such
+checkpoint exists for `quy`**, so this module builds the equivalent itself
+instead of depending on one: `main.py`'s first-run setup calls
+[`finetune_hf_vits/convert_original_discriminator_checkpoint.py`](./finetune_hf_vits/convert_original_discriminator_checkpoint.py),
+which downloads the original (non-HF-ported) discriminator weights from
+Meta's [`facebook/mms-tts`](https://huggingface.co/facebook/mms-tts) full-models
+release for the `quy` language code and merges them with the
+`facebook/mms-tts-quy` generator, producing a local trainable checkpoint at
+`finetune_hf_vits/mms-tts-quy-train/` (gitignored, not pushed anywhere).
+
+So the model lineage is: `facebook/mms-tts-quy` (generator, HF format) +
+`facebook/mms-tts` (discriminator, original non-HF checkpoint format) →
+merged locally → `finetune_hf_vits/mms-tts-quy-train/` (trainable base) →
+fine-tuned on the corpus → `--output-dir` (final `transformers.VitsModel`).
+
 ## Why not Coqui, why not LoRA
 
 Earlier iterations of this module tried training VITS from scratch with

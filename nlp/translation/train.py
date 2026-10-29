@@ -18,8 +18,9 @@ load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
-DEFAULT_SPLIT = "train"
-DEFAULT_EVAL_SIZE = 0.1
+DEFAULT_TRAIN_SPLIT = "train"
+DEFAULT_VALIDATION_SPLIT = "validation"
+DEFAULT_SOURCE_PREFIXES = ["americasnlp"]
 DEFAULT_MODEL = "facebook/nllb-200-distilled-600M"
 DEFAULT_OUTPUT_DIR = "./nllb-quy-spa-lora"
 DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/nllb-quechua-spanish"
@@ -30,7 +31,11 @@ def parse_args():
         description=(
             "Fine-tune NLLB-200 (LoRA) for Quechua<->Spanish translation, "
             "both directions in a single model, pulling the parallel dataset "
-            "straight from the Hugging Face Hub."
+            "straight from the Hugging Face Hub. Trains on --train-split and "
+            "validates on --validation-split -- native splits fixed at the "
+            "data level (see preprocessing/scripts/assign_splits.py), shared "
+            "with stt/ and tts/, so 'test' is never loaded here and stays a "
+            "clean benchmark for evaluation/eval_mt.py."
         )
     )
     parser.add_argument(
@@ -38,14 +43,25 @@ def parse_args():
         default=DEFAULT_DATASET,
         help="HF dataset repo id following preprocessing/docs/dataset-schema.md (text_quy/text_spa columns)",
     )
-    parser.add_argument("--split", default=DEFAULT_SPLIT)
+    parser.add_argument("--train-split", default=DEFAULT_TRAIN_SPLIT)
+    parser.add_argument("--validation-split", default=DEFAULT_VALIDATION_SPLIT)
     parser.add_argument("--text-column-quy", default="text_quy")
     parser.add_argument("--text-column-spa", default="text_spa")
+    parser.add_argument("--source-column", default="source")
     parser.add_argument(
-        "--eval-size",
-        type=float,
-        default=DEFAULT_EVAL_SIZE,
-        help="Fraction of --split held out for eval; 0 reuses the train set as eval",
+        "--source-prefixes",
+        nargs="+",
+        default=DEFAULT_SOURCE_PREFIXES,
+        help=(
+            "Only rows whose --source-column starts with one of these "
+            "prefixes are used for training/validation -- an explicit "
+            "allow-list rather than 'everything with non-blank text_spa', "
+            "so a new source never gets pulled into training just by "
+            "having both languages populated. Currently only "
+            "'americasnlp' sources are cleaned (see "
+            "preprocessing/scripts/clean_text.py) and dialect-verified for "
+            "this pair."
+        ),
     )
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Base NLLB-200 checkpoint")
     parser.add_argument("--max-length", type=int, default=128)
@@ -123,16 +139,18 @@ def main():
     device = pick_device()
     print(f"Device: {device}")
 
-    print(f"1. Loading parallel dataset ({args.dataset}, split={args.split})...")
-    dataset = load_dataset(args.dataset, split=args.split)
-    dataset = dataset.select_columns([args.text_column_quy, args.text_column_spa])
-    dataset = build_bidirectional_dataset(dataset, args.text_column_quy, args.text_column_spa)
+    print(f"1. Loading parallel dataset ({args.dataset})...")
+    columns = [args.text_column_quy, args.text_column_spa, args.source_column]
 
-    if args.eval_size > 0:
-        split_dataset = dataset.train_test_split(test_size=args.eval_size, seed=args.seed)
-        train_dataset, eval_dataset = split_dataset["train"], split_dataset["test"]
-    else:
-        train_dataset, eval_dataset = dataset, dataset
+    def allowed_source(ex):
+        return str(ex[args.source_column]).startswith(tuple(args.source_prefixes))
+
+    train_raw = load_dataset(args.dataset, split=args.train_split).select_columns(columns).filter(allowed_source)
+    validation_raw = load_dataset(args.dataset, split=args.validation_split).select_columns(columns).filter(allowed_source)
+    print(f"   {len(train_raw)} train rows, {len(validation_raw)} validation rows (source startswith {args.source_prefixes})")
+
+    train_dataset = build_bidirectional_dataset(train_raw, args.text_column_quy, args.text_column_spa)
+    eval_dataset = build_bidirectional_dataset(validation_raw, args.text_column_quy, args.text_column_spa)
 
     print(f"2. Loading NLLB tokenizer and base model ({args.model})...")
     tokenizer = AutoTokenizer.from_pretrained(args.model)
@@ -181,6 +199,7 @@ def main():
         save_steps=args.save_steps,
         eval_strategy="steps",
         eval_steps=args.eval_steps,
+        seed=args.seed,
         predict_with_generate=True,
         fp16=(device == "cuda"),  # mps doesn't support fp16 training reliably; cpu doesn't support it at all
         report_to="none",

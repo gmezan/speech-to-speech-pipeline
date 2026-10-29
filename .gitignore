@@ -234,3 +234,5 @@ tts/vits-*/
 *.env
 *.venv
 *.pem
+.claude
+evaluation/mt_results.jsonl
