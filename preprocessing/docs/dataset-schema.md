@@ -3,11 +3,15 @@
 The live dataset, [`gmezan/quechua-spanish-parallel`](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel),
 follows this shape. It was bootstrapped (`scripts/bootstrap_init_dataset.py`)
 from `josemercado/quechua-chanka-asr`, which only had Quechua (`audio` +
-`TEXTO`) — so today every row has `text_quy`/`audio_quy` populated and the
-Spanish columns blank. The parallel data-collection effort is filling in the
-Spanish counterpart for each row over time. This shape lets the raw data keep
-growing/changing without breaking `preprocessing/` or anything built on top
-of it.
+`TEXTO`) — so those rows have `text_quy`/`audio_quy` populated and the
+Spanish columns blank. It has since been merged with text-only parallel
+sentence pairs from the AmericasNLP 2024 shared task (`jw300`, `minedu`),
+which populate both `text_quy` and `text_spa` but no audio. Each row's origin
+is recorded in the `source` column — see
+[`docs/datasets/quechua-spanish-parallel.md`](../../docs/datasets/quechua-spanish-parallel.md)
+for the full provenance table and how to filter/aggregate by source. This
+shape lets the raw data keep growing/changing without breaking
+`preprocessing/` or anything built on top of it.
 
 ## Columns
 
@@ -21,6 +25,7 @@ of it.
 | `speaker_quy` *(optional)* | `string` | recorder/speaker id for the Quechua take — enables speaker-aware TTS later and lets you check for speaker leakage across splits |
 | `speaker_spa` *(optional)* | `string` | same, for the Spanish take |
 | `split` *(optional)* | `string` | `"train"` / `"validation"` / `"test"`, if you want splits fixed at the data level instead of re-derived randomly on load |
+| `source` | `string` | which upstream dataset this row came from (e.g. `josemercado/quechua-chanka-asr`, `americasnlp2024/jw300`); use it to filter to rows with the column availability a given use case needs |
 
 Lowercase `text_<lang>` / `audio_<lang>` naming uses ISO 639-3 codes
 (`quy` = Chanka Quechua, `spa` = Spanish) — the same codes `speech_compilation`
