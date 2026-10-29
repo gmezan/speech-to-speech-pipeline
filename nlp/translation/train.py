@@ -80,6 +80,12 @@ def parse_args():
     parser.add_argument("--per-device-train-batch-size", type=int, default=8)
     parser.add_argument("--per-device-eval-batch-size", type=int, default=8)
     parser.add_argument("--gradient-accumulation-steps", type=int, default=1)
+    parser.add_argument(
+        "--gradient-checkpointing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Trade compute for memory (recomputes activations in the backward pass) -- on by default since NLLB-600M plus generation during eval is tight on a 15GB GPU",
+    )
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--warmup-steps", type=int, default=50)
     parser.add_argument("--max-steps", type=int, default=500)
@@ -201,6 +207,7 @@ def main():
         eval_steps=args.eval_steps,
         seed=args.seed,
         predict_with_generate=True,
+        gradient_checkpointing=args.gradient_checkpointing,
         fp16=(device == "cuda"),  # mps doesn't support fp16 training reliably; cpu doesn't support it at all
         report_to="none",
     )
