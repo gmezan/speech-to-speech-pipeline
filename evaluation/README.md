@@ -94,7 +94,12 @@ errors rather than the data-encoding issue they actually are.
 uv run eval_mt.py --model facebook/nllb-200-distilled-600M --limit 50
 ```
 
-`--limit` caps eval rows per direction for a quick smoke test. Each run
+`--limit` caps eval rows per direction for a quick smoke test. Pass
+`--revision` to pin a specific tagged commit of `--model` (e.g.
+`--revision epoch-2`) rather than whatever's currently on `main` — useful
+when several training runs have pushed to the same Hub repo over time (see
+`nlp/translation/train.py`'s `--tag`) and you want to score one of them by
+name even after later runs moved `main` past it. Each run
 appends a JSON line (model, scores per direction/source, sentences/sec) to
 `mt_results.jsonl` (configurable via `--results-path`, gitignored — it's a
 local run log, not a committed artifact), so repeated runs across the base,
@@ -115,6 +120,25 @@ one-off numbers. Run `uv run eval_mt.py --help` for the full list of options.
   project's target variety (unlike the earlier Chanka setup, which only had
   an approximate code to work with) — so this dialect-mismatch caveat no
   longer applies, as long as the eval data itself is genuine `quz`.
+
+## `publish_model_card.py` — document eval results on the model card
+
+```sh
+uv run publish_model_card.py --model gmezan/nllb-quechua-spanish --label epoch-2 --results-path mt_results.jsonl
+```
+
+Takes the last line of a `eval_mt.py` results JSONL and writes its full
+per-direction/per-source BLEU/chrF++ table onto `--model`'s Hub model card
+(`README.md`), under a block scoped to `--label` (needs write access, i.e.
+`HF_TOKEN`). Re-running with the same `--label` replaces that block in
+place rather than duplicating it; different labels accumulate side by side
+under one `## Evaluation results` section — so a model repo that's been
+pushed to multiple times (e.g. once per epoch, tagged via
+`nlp/translation/train.py`'s `--tag`) ends up with every epoch's full eval
+breakdown documented on the same card, not just whatever was pushed last.
+`--label` is just a section name and doesn't have to match a real Hub
+revision, but normally should (e.g. `epoch-2`) so the card's claims are
+easy to verify by re-running `eval_mt.py --revision epoch-2`.
 
 ## Shared code
 

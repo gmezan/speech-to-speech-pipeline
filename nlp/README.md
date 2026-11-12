@@ -57,6 +57,11 @@ re-derived here, so `test` rows are never loaded by this script —
 `facebook/nllb-200-distilled-600M`) for `--max-steps` (default 500), and
 saves the adapter to `<output-dir>-adapter`.
 
+Pass `--num-train-epochs N` instead of `--max-steps` to train for N full
+passes over `--train-split` regardless of effective batch size — useful
+since multi-GPU setups (e.g. Kaggle's T4×2) silently double throughput via
+`DataParallel`, which a hardcoded step count can't account for.
+
 ```sh
 uv run translation/train.py --push-to-hub
 ```
@@ -68,6 +73,14 @@ plus tokenizer to `--hub-repo-id` (default
 `stt/`. Run `uv run translation/train.py --help` for the full list of
 options (LoRA rank/alpha/dropout/target modules, batch size, learning
 rate, max length, etc).
+
+Pass `--tag epoch-1` (or any label) alongside `--push-to-hub` to tag the
+commit just pushed — lets you keep training the *same* `--hub-repo-id`
+across multiple runs (e.g. one epoch per Kaggle session, each continuing
+from the previous one's `main`) while still being able to pull any earlier
+run back by name later (`from_pretrained(repo_id, revision="epoch-1")`),
+even after newer commits have moved `main` past it. See
+`infra/kaggle_train_epoch.ipynb` for this exact workflow end to end.
 
 ## `translation/translate.py` — quick manual testing
 

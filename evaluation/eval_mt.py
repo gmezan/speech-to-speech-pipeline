@@ -62,6 +62,11 @@ def parse_args():
     parser.add_argument("--text-column-spa", default="text_spa")
     parser.add_argument("--source-column", default="source", help="Column to break scores down by, if present")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Translation model repo id or local path to evaluate")
+    parser.add_argument(
+        "--revision",
+        default=None,
+        help="Specific Hub revision of --model to load (tag/branch/commit sha), e.g. 'epoch-1' -- defaults to the latest commit on main",
+    )
     parser.add_argument("--max-length", type=int, default=DEFAULT_MAX_LENGTH)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--limit", type=int, default=None, help="Cap eval rows per direction for a quick smoke test")
@@ -130,9 +135,9 @@ def main():
     eval_dataset = eval_dataset.shuffle(seed=42)
     print(f"   {len(eval_dataset)} eval rows (both directions combined)")
 
-    print(f"2. Loading translation model ({args.model})...")
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForSeq2SeqLM.from_pretrained(args.model).to(device)
+    print(f"2. Loading translation model ({args.model}" + (f", revision={args.revision}" if args.revision else "") + ")...")
+    tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.revision)
+    model = AutoModelForSeq2SeqLM.from_pretrained(args.model, revision=args.revision).to(device)
     model.eval()
 
     print("3. Translating eval set...")
@@ -173,6 +178,7 @@ def main():
     print("4. Scoring (BLEU + chrF++)...")
     results = {
         "model": args.model,
+        "revision": args.revision,
         "dataset": args.dataset,
         "split": args.split,
         "sentences_per_second": round(rate, 2) if rate else None,

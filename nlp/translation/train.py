@@ -3,6 +3,7 @@ import os
 
 from datasets import concatenate_datasets, load_dataset
 from dotenv import load_dotenv
+from huggingface_hub import HfApi
 from peft import LoraConfig, get_peft_model
 from transformers import (
     AutoModelForSeq2SeqLM,
@@ -88,10 +89,31 @@ def parse_args():
     )
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--warmup-steps", type=int, default=50)
-    parser.add_argument("--max-steps", type=int, default=500)
+    parser.add_argument("--max-steps", type=int, default=500, help="Ignored if --num-train-epochs is set")
+    parser.add_argument(
+        "--num-train-epochs",
+        type=float,
+        default=None,
+        help=(
+            "Train for this many full passes over --train-split instead of a fixed "
+            "--max-steps -- lets the trainer compute the right step count regardless "
+            "of effective batch size (e.g. multi-GPU DataParallel silently doubling "
+            "throughput), which a hardcoded --max-steps can't account for."
+        ),
+    )
     parser.add_argument("--logging-steps", type=int, default=25)
     parser.add_argument("--save-steps", type=int, default=100)
     parser.add_argument("--eval-steps", type=int, default=100)
+    parser.add_argument(
+        "--disable-tqdm",
+        action="store_true",
+        help=(
+            "Turn off the per-step progress bar, leaving only the periodic "
+            "--logging-steps loss/lr lines -- useful when stdout isn't a real "
+            "terminal (e.g. `!python ...` in a notebook), where tqdm can't "
+            "overwrite its line in place and instead prints a new one per update."
+        ),
+    )
 
     parser.add_argument(
         "--push-to-hub",
@@ -107,6 +129,15 @@ def parse_args():
         help="Target model repo id. Defaults to '$HF_USERNAME/nllb-quechua-spanish'",
     )
     parser.add_argument("--private", action="store_true", help="Create the Hub repo as private")
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help=(
+            "After pushing, tag the commit just pushed (e.g. 'epoch-1') so it stays "
+            "retrievable by name (from_pretrained(repo_id, revision=tag)) even after "
+            "later runs push newer commits to the same --hub-repo-id's main branch."
+        ),
+    )
 
     args = parser.parse_args()
     if args.push_to_hub and not args.hub_repo_id:
@@ -193,6 +224,13 @@ def main():
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
     print("5. Setting up training arguments...")
+    # -1/unset is HF's convention for "use the other one": max_steps=-1 defers to
+    # num_train_epochs, and vice versa -- so only one of the two is ever active.
+    length_kwargs = (
+        {"num_train_epochs": args.num_train_epochs, "max_steps": -1}
+        if args.num_train_epochs is not None
+        else {"max_steps": args.max_steps}
+    )
     training_args = Seq2SeqTrainingArguments(
         output_dir=args.output_dir,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -200,7 +238,6 @@ def main():
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         learning_rate=args.learning_rate,
         warmup_steps=args.warmup_steps,
-        max_steps=args.max_steps,
         logging_steps=args.logging_steps,
         save_steps=args.save_steps,
         eval_strategy="steps",
@@ -210,6 +247,8 @@ def main():
         gradient_checkpointing=args.gradient_checkpointing,
         fp16=(device == "cuda"),  # mps doesn't support fp16 training reliably; cpu doesn't support it at all
         report_to="none",
+        disable_tqdm=args.disable_tqdm,
+        **length_kwargs,
     )
 
     trainer = Seq2SeqTrainer(
@@ -233,6 +272,10 @@ def main():
         merged_model = model.merge_and_unload()
         merged_model.push_to_hub(args.hub_repo_id, private=args.private)
         tokenizer.push_to_hub(args.hub_repo_id, private=args.private)
+
+        if args.tag:
+            print(f"9. Tagging this commit as '{args.tag}'...")
+            HfApi().create_tag(args.hub_repo_id, tag=args.tag, repo_type="model", exist_ok=True)
 
     print("Done! Translation model is ready.")
 

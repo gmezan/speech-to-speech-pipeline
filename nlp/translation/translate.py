@@ -35,6 +35,11 @@ def parse_args():
         help="Model repo id. Defaults to '$HF_USERNAME/nllb-quechua-spanish'; "
         "pass 'facebook/nllb-200-distilled-600M' to try the untuned base model",
     )
+    parser.add_argument(
+        "--revision",
+        default=None,
+        help="Specific Hub revision of --model to load (tag/branch/commit sha), e.g. 'epoch-1' -- defaults to the latest commit on main",
+    )
     parser.add_argument("--max-length", type=int, default=128)
     args = parser.parse_args()
     if args.src == args.tgt:
@@ -46,8 +51,8 @@ def main():
     args = parse_args()
     device = pick_device()
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model, src_lang=LANG_CODES[args.src])
-    model = AutoModelForSeq2SeqLM.from_pretrained(args.model).to(device)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, src_lang=LANG_CODES[args.src], revision=args.revision)
+    model = AutoModelForSeq2SeqLM.from_pretrained(args.model, revision=args.revision).to(device)
 
     inputs = tokenizer(args.text, return_tensors="pt").to(device)
     forced_bos_token_id = tokenizer.convert_tokens_to_ids(LANG_CODES[args.tgt])
