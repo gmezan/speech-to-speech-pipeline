@@ -15,8 +15,8 @@ load_dotenv()
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
 DEFAULT_SPLIT = "test"
-DEFAULT_AUDIO_COLUMN = "audio_quy"
-DEFAULT_TEXT_COLUMN = "text_quy"
+DEFAULT_AUDIO_COLUMN = "audio_quz"
+DEFAULT_TEXT_COLUMN = "text_quz"
 DEFAULT_MODEL = f"{HF_USERNAME}/whisper-quechua"
 SAMPLING_RATE = 16000
 

@@ -22,7 +22,7 @@ DEFAULT_TRAIN_SPLIT = "train"
 DEFAULT_VALIDATION_SPLIT = "validation"
 DEFAULT_SOURCE_PREFIXES = ["americasnlp"]
 DEFAULT_MODEL = "facebook/nllb-200-distilled-600M"
-DEFAULT_OUTPUT_DIR = "./nllb-quy-spa-lora"
+DEFAULT_OUTPUT_DIR = "./nllb-quz-spa-lora"
 DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/nllb-quechua-spanish"
 
 
@@ -41,11 +41,11 @@ def parse_args():
     parser.add_argument(
         "--dataset",
         default=DEFAULT_DATASET,
-        help="HF dataset repo id following preprocessing/docs/dataset-schema.md (text_quy/text_spa columns)",
+        help="HF dataset repo id following preprocessing/docs/dataset-schema.md (text_quz/text_spa columns)",
     )
     parser.add_argument("--train-split", default=DEFAULT_TRAIN_SPLIT)
     parser.add_argument("--validation-split", default=DEFAULT_VALIDATION_SPLIT)
-    parser.add_argument("--text-column-quy", default="text_quy")
+    parser.add_argument("--text-column-quz", default="text_quz")
     parser.add_argument("--text-column-spa", default="text_spa")
     parser.add_argument("--source-column", default="source")
     parser.add_argument(
@@ -114,29 +114,29 @@ def parse_args():
     return args
 
 
-def build_bidirectional_dataset(dataset, text_col_quy, text_col_spa):
-    """Turn each aligned (quy, spa) row into two training examples, one per
-    translation direction, so a single fine-tune covers both quy->spa and
-    spa->quy (NLLB is a single many-to-many model, not per-direction)."""
-    quy_to_spa = dataset.map(
+def build_bidirectional_dataset(dataset, text_col_quz, text_col_spa):
+    """Turn each aligned (quz, spa) row into two training examples, one per
+    translation direction, so a single fine-tune covers both quz->spa and
+    spa->quz (NLLB is a single many-to-many model, not per-direction)."""
+    quz_to_spa = dataset.map(
         lambda ex: {
-            "src_text": ex[text_col_quy],
+            "src_text": ex[text_col_quz],
             "tgt_text": ex[text_col_spa],
-            "src_lang": LANG_CODES["quy"],
+            "src_lang": LANG_CODES["quz"],
             "tgt_lang": LANG_CODES["spa"],
         },
         remove_columns=dataset.column_names,
     )
-    spa_to_quy = dataset.map(
+    spa_to_quz = dataset.map(
         lambda ex: {
             "src_text": ex[text_col_spa],
-            "tgt_text": ex[text_col_quy],
+            "tgt_text": ex[text_col_quz],
             "src_lang": LANG_CODES["spa"],
-            "tgt_lang": LANG_CODES["quy"],
+            "tgt_lang": LANG_CODES["quz"],
         },
         remove_columns=dataset.column_names,
     )
-    combined = concatenate_datasets([quy_to_spa, spa_to_quy])
+    combined = concatenate_datasets([quz_to_spa, spa_to_quz])
     return combined.filter(lambda ex: ex["src_text"] and ex["tgt_text"])
 
 
@@ -146,7 +146,7 @@ def main():
     print(f"Device: {device}")
 
     print(f"1. Loading parallel dataset ({args.dataset})...")
-    columns = [args.text_column_quy, args.text_column_spa, args.source_column]
+    columns = [args.text_column_quz, args.text_column_spa, args.source_column]
 
     def allowed_source(ex):
         return str(ex[args.source_column]).startswith(tuple(args.source_prefixes))
@@ -155,8 +155,8 @@ def main():
     validation_raw = load_dataset(args.dataset, split=args.validation_split).select_columns(columns).filter(allowed_source)
     print(f"   {len(train_raw)} train rows, {len(validation_raw)} validation rows (source startswith {args.source_prefixes})")
 
-    train_dataset = build_bidirectional_dataset(train_raw, args.text_column_quy, args.text_column_spa)
-    eval_dataset = build_bidirectional_dataset(validation_raw, args.text_column_quy, args.text_column_spa)
+    train_dataset = build_bidirectional_dataset(train_raw, args.text_column_quz, args.text_column_spa)
+    eval_dataset = build_bidirectional_dataset(validation_raw, args.text_column_quz, args.text_column_spa)
 
     print(f"2. Loading NLLB tokenizer and base model ({args.model})...")
     tokenizer = AutoTokenizer.from_pretrained(args.model)

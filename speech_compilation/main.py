@@ -10,7 +10,7 @@ OUTPUT_DIR = "output"
 
 LANGUAGE_NAMES = {
     "spa": "Spanish",
-    "quy": "Quechua",
+    "quz": "Quechua",
     "eng": "English",
 }
 

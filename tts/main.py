@@ -21,14 +21,14 @@ HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 # Same underlying Quechua speech corpus `stt/` trains on, pulled in its raw
 # form (audio + transcript) — fine-tuning here starts from Meta's
 # pretrained MMS-TTS checkpoint for this exact language variant
-# (facebook/mms-tts-quy), via the vendored `finetune_hf_vits/` toolkit
+# (facebook/mms-tts-quz), via the vendored `finetune_hf_vits/` toolkit
 # (github.com/ylacombe/finetune-hf-vits, MIT licensed). See README.
-DEFAULT_LANGUAGE_CODE = "quy"
+DEFAULT_LANGUAGE_CODE = "quz"
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
-DEFAULT_AUDIO_COLUMN = "audio_quy"
-DEFAULT_TEXT_COLUMN = "text_quy"
+DEFAULT_AUDIO_COLUMN = "audio_quz"
+DEFAULT_TEXT_COLUMN = "text_quz"
 DEFAULT_SAMPLE_TEXT = "Achikyaqta parayta qallarimun."
-DEFAULT_OUTPUT_DIR = "./vits-quy-finetuned"
+DEFAULT_OUTPUT_DIR = "./vits-quz-finetuned"
 DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/vits-quechua"
 
 

@@ -1,6 +1,6 @@
 # speech-to-speech-pipeline
 
-A Quechua (Chanka variant) ↔ Spanish speech pipeline: collect aligned speech
+A Quechua (Collao variant) ↔ Spanish speech pipeline: collect aligned speech
 data, fine-tune speech-to-text and text-to-speech models on it, and serve
 them. Each stage is its own `uv`-managed Python project; `HF_TOKEN`/
 `HF_USERNAME` (via a per-module `.env`) is the shared thread — every stage
@@ -30,11 +30,12 @@ collection mechanism for the Spanish side of the parallel corpus (see below).
 
 A training dataset first needs to exist on the Hub following the
 [parallel schema](./preprocessing/docs/dataset-schema.md) (`id`,
-`text_quy`/`audio_quy`, `text_spa`/`audio_spa`/`speaker_quy`/`speaker_spa`/
+`text_quz`/`audio_quz`, `text_spa`/`audio_spa`/`speaker_quz`/`speaker_spa`/
 `split`) before either `stt/` or `tts/` can train — this repo's
 [`gmezan/quechua-spanish-parallel`](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel)
-is populated this way (Quechua side filled in, Spanish side still blank
-pending collection).
+is populated this way, but currently text-only (both `text_quz` and
+`text_spa` filled in, no audio yet on either side), so `stt/`/`tts/` can't
+train against it until real `quz` audio is collected and merged in.
 
 `main.py` pulls `gmezan/quechua-spanish-parallel`, resamples audio to
 16kHz, extracts log-Mel features and tokenizes labels with a
@@ -56,18 +57,18 @@ box (see `infra/`). Already trained and pushed.
 
 ### 4. [`tts/`](./tts) — text-to-speech
 
-Fine-tunes Meta's `facebook/mms-tts-quy` (VITS) checkpoint on the same raw
-Quechua corpus (`gmezan/quechua-spanish-parallel`, `text_quy`/`audio_quy`),
+Fine-tunes Meta's `facebook/mms-tts-quz` (VITS) checkpoint on the same raw
+Quechua corpus (`gmezan/quechua-spanish-parallel`, `text_quz`/`audio_quz`),
 via a vendored copy of `ylacombe/finetune-hf-vits` (plain `transformers`
 VITS has no training support). Verified end-to-end on a tiny smoke run
 (`--limit 8`, CPU); a real training run (200 epochs, on a GPU box) and the
 push to `gmezan/vits-quechua` have not been done yet — `app/` still falls
-back to the untuned `facebook/mms-tts-quy` baseline.
+back to the untuned `facebook/mms-tts-quz` baseline.
 
 ### 5. [`app/`](./app) — playground
 
 Gradio UI to manually test STT (`gmezan/whisper-quechua`) and TTS
-(`facebook/mms-tts-quy`, baseline) **in isolation** — there is no speech ↔
+(`facebook/mms-tts-quz`, baseline) **in isolation** — there is no speech ↔
 speech wiring between them yet (see below). Both are Quechua-only, despite
 `--language spanish` being a Whisper decoder-token anchor, not a sign of
 Spanish training data — for real Spanish STT/TTS use the base
@@ -93,9 +94,9 @@ Hub like everything else:
 
 [`translation/`](./nlp/translation) LoRA fine-tunes
 `facebook/nllb-200-distilled-600M` — a single many-to-many model, not one
-per direction — on `text_quy`/`text_spa` to translate both Quechua→Spanish
-and Spanish→Quechua. Code is wired up and ready, but blocked on the same
-missing Spanish corpus as above, so it hasn't been run for real yet.
+per direction — on `text_quz`/`text_spa` to translate both Quechua→Spanish
+and Spanish→Quechua. Code is wired up and ready, and the Spanish side of the
+corpus is now populated (see below) — it just hasn't been run for real yet.
 
 See [`docs/hardware-requirements.md`](./docs/hardware-requirements.md) for
 disk/RAM/GPU sizing per model and variant, plus Quechua-only vs.
@@ -112,8 +113,10 @@ and running `stt/`'s and `tts/`'s `--push-to-hub` commands there for real
 - Aligned-recording tool (`speech_compilation/`) built and already used to
   produce the Quechua clips in the dataset.
 - Parallel dataset schema designed and the Hub dataset
-  (`gmezan/quechua-spanish-parallel`) bootstrapped with the Quechua side
-  populated (500 rows); every module now points at it.
+  (`gmezan/quechua-spanish-parallel`) now holds 136,589 genuine Quechua
+  Collao (`quz`) ↔ Spanish text pairs from AmericasNLP2024's JW300 corpus
+  (`text_quz`/`text_spa` both populated, no audio yet); every module now
+  points at it.
 - Whisper-ready preprocessing pipeline (`preprocessing/main.py`) built, run,
   and pushed (`gmezan/quechua-whisper-ready`).
 - Whisper LoRA fine-tune (`stt/`) built, trained, merged, and pushed
@@ -125,28 +128,29 @@ and running `stt/`'s and `tts/`'s `--push-to-hub` commands there for real
   TTS model via round-trip intelligibility.
 - Translation (`nlp/translation/`) scaffolded: LoRA fine-tune of
   `facebook/nllb-200-distilled-600M` for both Quechua↔Spanish directions in
-  one model, plus a CLI to test it. Not run yet — needs the Spanish corpus.
+  one model, plus a CLI to test it. Not run yet, but no longer blocked — the
+  Spanish-side text now exists.
 
 ## What's left
 
-- **Collect the Spanish side of the corpus.** `text_spa`/`audio_spa`/
-  `speaker_*`/`split` are still blank on every row — `speech_compilation/` is
-  built for this but the recording pass itself hasn't happened. Until then,
-  translation and speech-to-speech use cases described in
-  [`dataset-schema.md`](./preprocessing/docs/dataset-schema.md) aren't
-  possible, only Quechua ASR/TTS.
+- **Collect real audio.** `audio_quz`/`audio_spa`/`speaker_*` are blank on
+  every row — the current corpus is 136,589 genuine `quz`↔`spa` text pairs
+  (JW300, AmericasNLP2024) with no recordings yet. `speech_compilation/` is
+  built for recording aligned clips, but that pass hasn't happened for the
+  `quz` variety. Until then, ASR (`stt/`) and TTS (`tts/`) have no `quz`
+  training audio to use; only text-only translation (`nlp/translation/`) can
+  train against this dataset today.
 - **Run a real `tts/` training pass** on a GPU box (200 epochs, not the
   8-sample smoke test) and push the result to `gmezan/vits-quechua`, then
   point `evaluation/eval_tts.py` and `app/` at it instead of the
-  `facebook/mms-tts-quy` baseline.
+  `facebook/mms-tts-quz` baseline.
 - **Wire `app/` into an actual speech-to-speech pipeline**: today STT and TTS
   are tested independently; there's no Quechua-audio-in →
   transcribe → (translate) → synthesize → Spanish/Quechua-audio-out flow.
 - **Run the translation fine-tune.** `nlp/translation/` (NLLB-200,
-  LoRA, both directions in one model) is built and ready but has never
-  been run for real — it's blocked on the same missing Spanish corpus as
-  above. Whether this pipeline ends up using it at all (vs. staying
-  Quechua-only end-to-end) is still an open call.
+  LoRA, both directions in one model) is built and ready and no longer
+  blocked — the Spanish-side text now exists — it just hasn't been run for
+  real yet.
 - **No perceptual TTS quality score.** `evaluation/eval_tts.py` gives an
   automatic intelligibility proxy, not naturalness/MOS — that still needs
   human evaluation if it matters for this project.

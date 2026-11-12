@@ -1,7 +1,7 @@
 # preprocessing
 
 Prepares the [gmezan/quechua-spanish-parallel](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel)
-dataset (Chanka Quechua speech paired with `text_quy` transcriptions, see
+dataset (Collao Quechua speech paired with `text_quz` transcriptions, see
 [dataset-schema.md](./docs/dataset-schema.md)) for Whisper fine-tuning:
 resamples audio to 16kHz, extracts log-Mel features, tokenizes labels, and
 saves the result to disk with `datasets.save_to_disk`.

@@ -1,10 +1,10 @@
 import torch
 
 # NLLB-200 FLORES-200 language codes for this project's pair.
-# quy_Latn = Ayacucho Quechua (closest NLLB-supported code to the Chanka
-# variant this project otherwise uses; see nlp/README.md).
+# quz_Latn = Cusco-Collao Quechua, an exact match for this project's target
+# variety (see nlp/README.md).
 LANG_CODES = {
-    "quy": "quy_Latn",
+    "quz": "quz_Latn",
     "spa": "spa_Latn",
 }
 

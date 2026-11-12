@@ -60,7 +60,7 @@ to one Whisper decoder language). As the source corpus grows to cover more
 than one language (see
 [`dataset-schema.md`](./dataset-schema.md)), the right move is to run
 `preprocessing/main.py` once per language — pointing `--audio-column`/
-`--text-column` at `audio_quy`/`text_quy` or `audio_spa`/`text_spa` — and
+`--text-column` at `audio_quz`/`text_quz` or `audio_spa`/`text_spa` — and
 write
 each to its own output directory (e.g. `quechua_whisper_ready/`,
 `spanish_whisper_ready/`). Don't fold a `language` column into this schema to

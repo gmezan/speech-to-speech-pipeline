@@ -20,9 +20,9 @@ load_dotenv()
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
 DEFAULT_SPLIT = "test"
-DEFAULT_TEXT_COLUMN = "text_quy"
-# facebook/mms-tts-quy until tts/ pushes a fine-tuned f"{HF_USERNAME}/vits-quechua"
-DEFAULT_TTS_MODEL = "facebook/mms-tts-quy"
+DEFAULT_TEXT_COLUMN = "text_quz"
+# facebook/mms-tts-quz until tts/ pushes a fine-tuned f"{HF_USERNAME}/vits-quechua"
+DEFAULT_TTS_MODEL = "facebook/mms-tts-quz"
 DEFAULT_STT_MODEL = f"{HF_USERNAME}/whisper-quechua"
 
 

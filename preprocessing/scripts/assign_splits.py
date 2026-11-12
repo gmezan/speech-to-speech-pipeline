@@ -23,7 +23,7 @@ def parse_args():
             "this pipeline (translation, STT, TTS), so retraining any of "
             "them against the same --dataset always sees the same held-out "
             "rows. Each row's split is a deterministic hash of its own "
-            "(text_quy, text_spa) content, not an index-based shuffle, so "
+            "(text_quz, text_spa) content, not an index-based shuffle, so "
             "re-running this after adding new rows only assigns the new "
             "ones -- existing rows never move between splits. Literal "
             "duplicate sentence pairs (even under a different source/id) "
@@ -33,7 +33,7 @@ def parse_args():
     )
     parser.add_argument("--dataset", default=DEFAULT_DATASET)
     parser.add_argument("--split", default=DEFAULT_SPLIT, help="HF split to load from the current (pre-partition) dataset")
-    parser.add_argument("--text-column-quy", default="text_quy")
+    parser.add_argument("--text-column-quz", default="text_quz")
     parser.add_argument("--text-column-spa", default="text_spa")
     parser.add_argument("--source-column", default="source", help="Column to report the per-source breakdown by, if present")
     parser.add_argument("--train-ratio", type=float, default=DEFAULT_TRAIN_RATIO)
@@ -47,10 +47,10 @@ def parse_args():
     return args
 
 
-def assign_split(example, text_col_quy, text_col_spa, train_ratio, validation_ratio):
-    quy = (example[text_col_quy] or "").strip().lower()
+def assign_split(example, text_col_quz, text_col_spa, train_ratio, validation_ratio):
+    quz = (example[text_col_quz] or "").strip().lower()
     spa = (example[text_col_spa] or "").strip().lower()
-    digest = hashlib.sha256(f"{quy}|{spa}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{quz}|{spa}".encode("utf-8")).hexdigest()
     bucket = int(digest, 16) % 10_000 / 10_000  # deterministic, stable float in [0, 1)
     if bucket < train_ratio:
         split = "train"
@@ -75,7 +75,7 @@ def main():
     print(f"1. Loading dataset ({args.dataset}, split={args.split})...")
     dataset = load_dataset(args.dataset, split=args.split)
     # Avoid decoding/re-encoding audio; keep the original bytes untouched.
-    for col in ("audio_quy", "audio_spa"):
+    for col in ("audio_quz", "audio_spa"):
         if col in dataset.column_names:
             dataset = dataset.cast_column(col, Audio(decode=False))
     # Recomputed fresh (not read back) so this script stays correct even
@@ -83,9 +83,9 @@ def main():
     if "split" in dataset.column_names:
         dataset = dataset.remove_columns(["split"])
 
-    print("2. Assigning split per row (deterministic hash of text_quy/text_spa)...")
+    print("2. Assigning split per row (deterministic hash of text_quz/text_spa)...")
     dataset = dataset.map(
-        lambda ex: assign_split(ex, args.text_column_quy, args.text_column_spa, args.train_ratio, args.validation_ratio)
+        lambda ex: assign_split(ex, args.text_column_quz, args.text_column_spa, args.train_ratio, args.validation_ratio)
     )
 
     print("3. Split breakdown:")

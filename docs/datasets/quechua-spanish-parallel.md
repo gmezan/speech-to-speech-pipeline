@@ -1,6 +1,6 @@
 # `gmezan/quechua-spanish-parallel`
 
-A parallel Quechua (Chanka, `quy`) ↔ Spanish (`spa`) corpus published on the
+A parallel Quechua (Collao, `quz`) ↔ Spanish (`spa`) corpus published on the
 Hugging Face Hub at
 [`gmezan/quechua-spanish-parallel`](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel).
 It aggregates rows from multiple source datasets into one schema, tagged by
@@ -16,29 +16,34 @@ how to pull/aggregate specific sources.
 
 | column | type | notes |
 |---|---|---|
-| `id` | `string` | `quy-NNNNNN`, sequential, unique, stable across pushes |
-| `text_quy` | `string` | Quechua (Chanka) text |
-| `audio_quy` | `Audio(sampling_rate=16000)` | Quechua speech recording of `text_quy`, where available |
-| `text_spa` | `string` | Spanish text — same meaning as `text_quy` |
+| `id` | `string` | `quz-NNNNNN`, sequential, unique, stable across pushes |
+| `text_quz` | `string` | Quechua (Collao) text |
+| `audio_quz` | `Audio(sampling_rate=16000)` | Quechua speech recording of `text_quz`, where available |
+| `text_spa` | `string` | Spanish text — same meaning as `text_quz` |
 | `audio_spa` | `Audio(sampling_rate=16000)` | Spanish speech recording of `text_spa`, where available |
-| `speaker_quy` / `speaker_spa` *(optional)* | `string` | recorder/speaker id, where known |
+| `speaker_quz` / `speaker_spa` *(optional)* | `string` | recorder/speaker id, where known |
 | `split` *(optional)* | `string` | `"train"` / `"validation"` / `"test"`, where fixed at the data level |
 | `source` | `string` | which upstream dataset this row came from — see below |
 
 ## Sources merged so far
 
+**Retired (Chanka-era, replaced):** the previous version of this dataset was
+bootstrapped from Chanka/Ayacucho-variety sources — `josemercado/quechua-chanka-asr`
+(500 audio rows) and the AmericasNLP2024 `quy` JW300/MINEDU files
+(`es-quy/jw300.es-quy.{es,quy}`, `minedu.quy-es.{es,quy}`) — before the
+project moved to Quechua Collao (`quz`). None of that is in the current
+dataset.
+
 | `source` value | rows | has audio | notes |
 |---|---:|---|---|
-| `josemercado/quechua-chanka-asr` | 500 | `audio_quy` only | Original Quechua ASR corpus. Bootstrapped via `preprocessing/scripts/bootstrap_init_dataset.py`. `text_spa`/`audio_spa` are blank — Spanish side not yet collected for these rows. |
-| `americasnlp2024/jw300` | 125,008 | none (text-only) | JW300 religious-text parallel sentences from the [AmericasNLP 2024 shared task](https://github.com/AmericasNLP/americasnlp2024), path `ST1_MachineTranslation/data/quechua-spanish/parallel_data/es-quy/jw300.es-quy.{es,quy}`. |
-| `americasnlp2024/minedu` | 643 | none (text-only) | Peru Ministry of Education (MINEDU) parallel sentences, same shared-task repo, `minedu.quy-es.{es,quy}`. |
+| `americasnlp2024/jw300` | 136,589 | none (text-only) | JW300 religious-text parallel sentences, genuine Quechua Collao (`quz`) — from the [AmericasNLP 2024 shared task](https://github.com/AmericasNLP/americasnlp2024), path `ST1_MachineTranslation/data/quechua-spanish/parallel_data/es-quz/jw300.es-quz.{es,quz}`. Ingested via `preprocessing/scripts/bootstrap_jw300_quz.py`. |
 
-Total: 126,151 rows as of this writing.
+Total: 136,589 rows as of this writing. No audio yet for any row — `audio_quz`/`audio_spa`
+are blank until real `quz` ASR/TTS recordings are collected.
 
-Not merged: the same AmericasNLP directory also has a `dict_misc.quy-es.*`
-pair (short dictionary-style entries rather than full sentences) — left out
-to keep this corpus sentence-level. Pull it in the same way described below
-if it's ever needed.
+Note: AmericasNLP2024 only has a `quz` JW300 file — there's no `quz`
+equivalent of the `minedu`/`dict_misc` sources (those exist only in `quy`),
+so they aren't available to merge in the same way the old Chanka corpus did.
 
 ## Loading the whole thing
 
@@ -54,25 +59,18 @@ Every row's provenance is in `source`, so slice by it directly:
 
 ```python
 jw300_only = ds.filter(lambda r: r["source"] == "americasnlp2024/jw300")
-asr_only   = ds.filter(lambda r: r["source"] == "josemercado/quechua-chanka-asr")
 ```
 
 ## Picking the right rows per use case
 
-Not every source is useful for every task — check which columns are actually
-populated before using a source for a given purpose:
-
-- **Text-only MT training** (`text_quy` ↔ `text_spa`): use all rows regardless
-  of source; `americasnlp2024/jw300` and `americasnlp2024/minedu` are
-  text-only to begin with, and `josemercado/quechua-chanka-asr` rows are
-  currently unusable for MT since `text_spa` is still blank there.
-- **ASR / TTS** (needs `audio_quy` or `audio_spa`): only
-  `josemercado/quechua-chanka-asr` rows have audio today (`audio_quy` only,
-  `audio_spa` still empty for all rows) — filter to that `source` first.
-- **Domain-aware splits**: `jw300` is large and skews religious/formal
-  register; `minedu` is small and skews educational. If you care about
-  register balance (e.g. don't want JW300's ~125k rows to dominate training),
-  stratify or subsample by `source` rather than relying on a random split.
+- **Text-only MT training** (`text_quz` ↔ `text_spa`): use all rows — the
+  only source today (`americasnlp2024/jw300`) is text-only and fully
+  populated on both sides.
+- **ASR / TTS** (needs `audio_quz` or `audio_spa`): no source has audio yet;
+  this needs a new `quz` recording/collection source added (see "Adding
+  another source later" below) before ASR/TTS can use this dataset.
+- **Domain skew**: all current rows are JW300 (religious/formal register) —
+  worth keeping in mind until a more varied `quz` source is added.
 
 ## Adding another source later
 
@@ -83,6 +81,6 @@ populated before using a source for a given purpose:
 3. Set a `source` string that identifies the origin (we use
    `owner/dataset-name` or `shared-task/corpus-name` style strings — keep that
    convention so filtering by `source` stays predictable).
-4. Continue the `id` sequence (`quy-NNNNNN`) from the current row count rather
+4. Continue the `id` sequence (`quz-NNNNNN`) from the current row count rather
    than restarting it, and `concatenate_datasets` + `push_to_hub` onto the
    existing `train` split.

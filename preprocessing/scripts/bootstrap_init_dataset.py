@@ -8,6 +8,7 @@ from huggingface_hub import HfApi
 load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
+# TODO: retired Chanka-era source; replace with the new quz corpus once collected.
 DEFAULT_SOURCE_DATASET = "josemercado/quechua-chanka-asr"
 DEFAULT_SOURCE_SPLIT = "train"
 DEFAULT_SOURCE_AUDIO_COLUMN = "audio"
@@ -21,11 +22,11 @@ SAMPLING_RATE = 16000
 SCHEMA = Features(
     {
         "id": Value("string"),
-        "text_quy": Value("string"),
-        "audio_quy": Audio(sampling_rate=SAMPLING_RATE),
+        "text_quz": Value("string"),
+        "audio_quz": Audio(sampling_rate=SAMPLING_RATE),
         "text_spa": Value("string"),
         "audio_spa": Audio(sampling_rate=SAMPLING_RATE),
-        "speaker_quy": Value("string"),
+        "speaker_quz": Value("string"),
         "speaker_spa": Value("string"),
         "split": Value("string"),
     }
@@ -62,12 +63,12 @@ def parse_args():
 def build_row_fn(audio_column, text_column):
     def to_row(example, idx):
         return {
-            "id": f"quy-{idx:06d}",
-            "text_quy": example[text_column],
-            "audio_quy": example[audio_column],
+            "id": f"quz-{idx:06d}",
+            "text_quz": example[text_column],
+            "audio_quz": example[audio_column],
             "text_spa": "",
             "audio_spa": None,
-            "speaker_quy": None,
+            "speaker_quz": None,
             "speaker_spa": None,
             "split": None,
         }

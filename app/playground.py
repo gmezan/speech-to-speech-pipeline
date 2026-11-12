@@ -28,9 +28,9 @@ STT_LANGUAGE = "spanish"  # decoder language anchor used during fine-tuning (see
 # Base Whisper checkpoint for genuine Spanish speech (separate from the Quechua fine-tune above).
 SPA_STT_MODEL_ID = os.environ.get("SPA_STT_MODEL_ID", "openai/whisper-small")
 
-# Base NLLB-200 checkpoint, to be swapped for a SPA->QUY fine-tune later.
+# Base NLLB-200 checkpoint, to be swapped for a SPA->QUZ fine-tune later.
 MT_MODEL_ID = os.environ.get("MT_MODEL_ID", "facebook/nllb-200-distilled-600M")
-MT_LANG_CODES = {"Spanish": "spa_Latn", "Quechua": "quy_Latn"}
+MT_LANG_CODES = {"Spanish": "spa_Latn", "Quechua": "quz_Latn"}
 
 
 def pick_device():
@@ -126,10 +126,10 @@ with gr.Blocks(title="Quechua STT / TTS Playground") as demo:
         f"- **STT**: `{STT_MODEL_ID}` (Whisper, LoRA fine-tuned on Quechua)\n"
         f"- **Spanish STT**: `{SPA_STT_MODEL_ID}` (base Whisper)\n"
         f"- **TTS**: `{TTS_MODEL_ID}` (MMS VITS baseline, pending a custom fine-tune)\n"
-        f"- **MT**: `{MT_MODEL_ID}` (base NLLB-200, pending a SPA->QUY fine-tune)"
+        f"- **MT**: `{MT_MODEL_ID}` (base NLLB-200, pending a SPA->QUZ fine-tune)"
     )
 
-    with gr.Tab("Speech (SPA) -> Speech (QUY)"):
+    with gr.Tab("Speech (SPA) -> Speech (QUZ)"):
         s2s_audio = gr.Audio(sources=["microphone", "upload"], type="filepath", label="Spanish audio")
         s2s_button = gr.Button("Translate speech")
         s2s_spanish_text = gr.Textbox(label="Transcribed Spanish text")

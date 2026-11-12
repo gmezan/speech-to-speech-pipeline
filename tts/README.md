@@ -1,8 +1,8 @@
 # tts
 
 Fine-tunes [Meta's MMS-TTS](https://huggingface.co/facebook/mms-tts) VITS
-checkpoint for Quechua — [`facebook/mms-tts-quy`](https://huggingface.co/facebook/mms-tts-quy),
-the exact Ayacucho/Chanka Quechua variant our data is in — on the Quechua
+checkpoint for Quechua — [`facebook/mms-tts-quz`](https://huggingface.co/facebook/mms-tts-quz),
+the exact Cusco-Collao Quechua variant our data is in — on the Quechua
 speech corpus. Training uses a vendored copy of
 [`ylacombe/finetune-hf-vits`](https://github.com/ylacombe/finetune-hf-vits)
 (MIT licensed, see [`finetune_hf_vits/LICENSE`](./finetune_hf_vits/LICENSE)),
@@ -12,31 +12,31 @@ training/discriminator support (`VitsModel.forward` raises
 the VITS generator+discriminator GAN training loop around the same
 `transformers` checkpoint format, using `accelerate`.
 
-## Base model: `facebook/mms-tts-quy` + merged discriminator
+## Base model: `facebook/mms-tts-quz` + merged discriminator
 
-The base checkpoint is [`facebook/mms-tts-quy`](https://huggingface.co/facebook/mms-tts-quy)
-(Meta's MMS-TTS VITS for Ayacucho/Chanka Quechua). As published, it's
+The base checkpoint is [`facebook/mms-tts-quz`](https://huggingface.co/facebook/mms-tts-quz)
+(Meta's MMS-TTS VITS for Cusco-Collao Quechua). As published, it's
 **generator-only** — fine for inference, but VITS fine-tuning needs a
 generator+discriminator pair for the GAN training objective, and
-`facebook/mms-tts-quy` ships without one.
+`facebook/mms-tts-quz` ships without one.
 
 For some languages, `ylacombe/finetune-hf-vits` (the toolkit this module
 vendors) publishes a ready-made `ylacombe/mms-tts-<lang>-train` checkpoint
 that already bundles a matching discriminator (e.g.
 `ylacombe/mms-tts-kor-train`, `ylacombe/mms-tts-guj-train` — see
 [`finetune_hf_vits/README.md`](./finetune_hf_vits/README.md)). **No such
-checkpoint exists for `quy`**, so this module builds the equivalent itself
+checkpoint exists for `quz`**, so this module builds the equivalent itself
 instead of depending on one: `main.py`'s first-run setup calls
 [`finetune_hf_vits/convert_original_discriminator_checkpoint.py`](./finetune_hf_vits/convert_original_discriminator_checkpoint.py),
 which downloads the original (non-HF-ported) discriminator weights from
 Meta's [`facebook/mms-tts`](https://huggingface.co/facebook/mms-tts) full-models
-release for the `quy` language code and merges them with the
-`facebook/mms-tts-quy` generator, producing a local trainable checkpoint at
-`finetune_hf_vits/mms-tts-quy-train/` (gitignored, not pushed anywhere).
+release for the `quz` language code and merges them with the
+`facebook/mms-tts-quz` generator, producing a local trainable checkpoint at
+`finetune_hf_vits/mms-tts-quz-train/` (gitignored, not pushed anywhere).
 
-So the model lineage is: `facebook/mms-tts-quy` (generator, HF format) +
+So the model lineage is: `facebook/mms-tts-quz` (generator, HF format) +
 `facebook/mms-tts` (discriminator, original non-HF checkpoint format) →
-merged locally → `finetune_hf_vits/mms-tts-quy-train/` (trainable base) →
+merged locally → `finetune_hf_vits/mms-tts-quz-train/` (trainable base) →
 fine-tuned on the corpus → `--output-dir` (final `transformers.VitsModel`).
 
 ## Why not Coqui, why not LoRA
@@ -51,7 +51,7 @@ Coqui TTS, then considered LoRA. Neither fit:
   convolutional/flow architecture the way it does on a transformer like
   Whisper, and no LoRA-ready Quechua VITS checkpoint exists to build on.
 
-Fine-tuning the real `facebook/mms-tts-quy` checkpoint is the better fit:
+Fine-tuning the real `facebook/mms-tts-quz` checkpoint is the better fit:
 purpose-built for this language, and the toolkit's own benchmark claims a
 good result in "20 minutes with as little as 80 to 150 samples" — well within
 what our corpus provides. Caveat: MMS checkpoints are
@@ -62,7 +62,7 @@ what our corpus provides. Caveat: MMS checkpoints are
 
 Like `stt/`, this trains on the same Quechua speech corpus
 ([`gmezan/quechua-spanish-parallel`](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel),
-`text_quy`/`audio_quy` columns — see
+`text_quz`/`audio_quz` columns — see
 [dataset-schema.md](../preprocessing/docs/dataset-schema.md)),
 pulled in its raw form (audio + transcript), not the Whisper-preprocessed
 form `preprocessing/` produces — that one strips raw audio and tokenizes
@@ -80,11 +80,11 @@ manual steps needed:
 1. **Build the `monotonic_align` Cython extension** (native, platform-specific,
    not committed — rebuilds automatically on a new machine, e.g. the GPU box).
 2. **Build the discriminator-equipped base checkpoint** for `--language-code`
-   (default `quy`): `facebook/mms-tts-quy` ships generator-only (inference
+   (default `quz`): `facebook/mms-tts-quz` ships generator-only (inference
    needs no discriminator); fine-tuning needs one. This downloads the
    original discriminator weights from `facebook/mms-tts` and merges them
    with the HF generator, caching the result at
-   `finetune_hf_vits/mms-tts-quy-train/` (gitignored, ~300MB).
+   `finetune_hf_vits/mms-tts-quz-train/` (gitignored, ~300MB).
 
 ## Usage
 
@@ -94,7 +94,7 @@ uv run main.py
 
 Pulls `--dataset` (default `gmezan/quechua-spanish-parallel`), fine-tunes for
 `--epochs` (default 200), and saves the final model to `--output-dir`
-(default `./vits-quy-finetuned`) — a plain `transformers.VitsModel` repo,
+(default `./vits-quz-finetuned`) — a plain `transformers.VitsModel` repo,
 no PEFT/Coqui/vendored-code dependency needed to use it afterward.
 
 For a quick correctness check instead of a real run:

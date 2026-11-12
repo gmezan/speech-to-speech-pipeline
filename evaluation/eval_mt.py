@@ -20,9 +20,9 @@ DEFAULT_MODEL = f"{HF_USERNAME}/nllb-quechua-spanish"
 DEFAULT_MAX_LENGTH = 128
 DEFAULT_RESULTS_PATH = "mt_results.jsonl"
 
-# Same FLORES-200 codes as translation/common.py (quy_Latn = Ayacucho
-# Quechua, the closest NLLB-supported code to this project's Chanka variant).
-LANG_CODES = {"quy": "quy_Latn", "spa": "spa_Latn"}
+# Same FLORES-200 codes as translation/common.py (quz_Latn = Cusco-Collao
+# Quechua, an exact match for this project's target variety).
+LANG_CODES = {"quz": "quz_Latn", "spa": "spa_Latn"}
 
 # Characters NLLB's SentencePiece vocab has no entry for (verified
 # empirically against facebook/nllb-200-distilled-600M -- they decode to
@@ -47,7 +47,7 @@ def normalize_text(text):
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Evaluate an NLLB quy<->spa translation model with BLEU/chrF++. "
+            "Evaluate an NLLB quz<->spa translation model with BLEU/chrF++. "
             "Loads the native 'test' split (see "
             "preprocessing/scripts/assign_splits.py) -- a fixed benchmark "
             "assigned once per row by content hash, so it stays the same set "
@@ -56,9 +56,9 @@ def parse_args():
             "can have indirectly optimized against it."
         )
     )
-    parser.add_argument("--dataset", default=DEFAULT_DATASET, help="Raw HF dataset repo id (text_quy/text_spa columns)")
+    parser.add_argument("--dataset", default=DEFAULT_DATASET, help="Raw HF dataset repo id (text_quz/text_spa columns)")
     parser.add_argument("--split", default=DEFAULT_SPLIT, help="Native HF split to score on")
-    parser.add_argument("--text-column-quy", default="text_quy")
+    parser.add_argument("--text-column-quz", default="text_quz")
     parser.add_argument("--text-column-spa", default="text_spa")
     parser.add_argument("--source-column", default="source", help="Column to break scores down by, if present")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Translation model repo id or local path to evaluate")
@@ -72,12 +72,12 @@ def parse_args():
 def build_eval_split(args):
     """Loads the native --split (a value fixed per row by
     preprocessing/scripts/assign_splits.py, a deterministic hash of each
-    row's own text content) before building the bidirectional (quy->spa /
-    spa->quy) examples -- so both directions of a given sentence pair always
+    row's own text content) before building the bidirectional (quz->spa /
+    spa->quz) examples -- so both directions of a given sentence pair always
     share the same split, and this benchmark set doesn't change just because
     the dataset grows. --source-column rides along only for reporting."""
     dataset = load_dataset(args.dataset, split=args.split)
-    columns = [args.text_column_quy, args.text_column_spa]
+    columns = [args.text_column_quz, args.text_column_spa]
     has_source = args.source_column in dataset.column_names
     if has_source:
         columns.append(args.source_column)
@@ -97,15 +97,15 @@ def build_eval_split(args):
 
         return _fn
 
-    quy_to_spa = dataset.map(
-        tag(args.text_column_quy, args.text_column_spa, LANG_CODES["quy"], LANG_CODES["spa"]),
+    quz_to_spa = dataset.map(
+        tag(args.text_column_quz, args.text_column_spa, LANG_CODES["quz"], LANG_CODES["spa"]),
         remove_columns=dataset.column_names,
     )
-    spa_to_quy = dataset.map(
-        tag(args.text_column_spa, args.text_column_quy, LANG_CODES["spa"], LANG_CODES["quy"]),
+    spa_to_quz = dataset.map(
+        tag(args.text_column_spa, args.text_column_quz, LANG_CODES["spa"], LANG_CODES["quz"]),
         remove_columns=dataset.column_names,
     )
-    combined = concatenate_datasets([quy_to_spa, spa_to_quy])
+    combined = concatenate_datasets([quz_to_spa, spa_to_quz])
     return combined.filter(lambda ex: ex["src_text"] and ex["tgt_text"])
 
 

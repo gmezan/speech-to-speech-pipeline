@@ -37,17 +37,16 @@ def normalize_text(text):
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Clean text_quy/text_spa of characters that decode to NLLB's "
+            "Clean text_quz/text_spa of characters that decode to NLLB's "
             "<unk> token (curly quotes, em/en dashes) plus invisible "
             "zero-width characters. Scoped to rows whose --source-column "
             "starts with --source-prefix (default 'americasnlp') -- the "
-            "only sources this noise was found in (see docs/datasets/"
-            "quechua-spanish-parallel.md); josemercado/quechua-chanka-asr "
-            "is left untouched."
+            "only source this noise was found in (see docs/datasets/"
+            "quechua-spanish-parallel.md)."
         )
     )
     parser.add_argument("--dataset", default=DEFAULT_DATASET)
-    parser.add_argument("--text-column-quy", default="text_quy")
+    parser.add_argument("--text-column-quz", default="text_quz")
     parser.add_argument("--text-column-spa", default="text_spa")
     parser.add_argument("--source-column", default="source")
     parser.add_argument("--source-prefix", default=DEFAULT_SOURCE_PREFIX, help="Only rows whose source starts with this are cleaned")
@@ -57,16 +56,16 @@ def parse_args():
     return parser.parse_args()
 
 
-def build_clean_fn(text_col_quy, text_col_spa, source_col, source_prefix, changed_counter):
+def build_clean_fn(text_col_quz, text_col_spa, source_col, source_prefix, changed_counter):
     def _clean(ex):
         if not str(ex.get(source_col, "")).startswith(source_prefix):
             return ex
-        new_quy = normalize_text(ex[text_col_quy])
+        new_quz = normalize_text(ex[text_col_quz])
         new_spa = normalize_text(ex[text_col_spa])
-        if new_quy != ex[text_col_quy] or new_spa != ex[text_col_spa]:
+        if new_quz != ex[text_col_quz] or new_spa != ex[text_col_spa]:
             changed_counter[ex[source_col]] += 1
             ex = dict(ex)
-            ex[text_col_quy] = new_quy
+            ex[text_col_quz] = new_quz
             ex[text_col_spa] = new_spa
         return ex
 
@@ -85,7 +84,7 @@ def main():
         print(f"2. Cleaning '{split_name}' split ({len(split)} rows)...")
         changed = Counter()
         cleaned_splits[split_name] = split.map(
-            build_clean_fn(args.text_column_quy, args.text_column_spa, args.source_column, args.source_prefix, changed)
+            build_clean_fn(args.text_column_quz, args.text_column_spa, args.source_column, args.source_prefix, changed)
         )
         if changed:
             for source, n in changed.most_common():

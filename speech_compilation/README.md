@@ -21,7 +21,7 @@ Place one or more flashcard CSVs in `data/`, named `flashcards_*.csv`.
 Each file is semicolon-delimited with a header row `ID;LANG1;LANG2`, e.g.:
 
 ```
-ID;SPA;QUY
+ID;SPA;QUZ
 F-0001;El niño va corriendo a la chacra.;Qari warma chakraman kallpaspa rin.
 ```
 

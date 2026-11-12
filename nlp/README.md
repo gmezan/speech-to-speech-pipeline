@@ -1,14 +1,13 @@
 # nlp
 
 Translation submodule: [`translation/`](./translation) LoRA fine-tunes
-`facebook/nllb-200-distilled-600M` for Quechua (Chanka) ↔ Spanish, pulling
+`facebook/nllb-200-distilled-600M` for Quechua (Collao) ↔ Spanish, pulling
 the parallel dataset straight from the Hub (same pattern as `stt/`/`tts/`).
 
-**Status: blocked.** Translation needs the Spanish side of
-[`gmezan/quechua-spanish-parallel`](https://huggingface.co/datasets/gmezan/quechua-spanish-parallel)
-(`text_spa`), which isn't collected yet (see the root README's "What's
-left"). This module is wired up and ready to run the moment that data
-exists — it hasn't been run for real.
+**Status: unblocked.** The dataset now has `text_spa` populated for every row
+(the `quz` corpus from `americasnlp2024/jw300` is fully bilingual) — this
+module hasn't been run for real yet, but there's no longer a data gap
+stopping it.
 
 ## One model, both directions
 
@@ -17,22 +16,23 @@ per direction: every input is tagged with a source-language token and the
 decoder is forced to start with a target-language token, out of a shared
 vocabulary covering all 200 languages. So `translation/train.py` fine-tunes
 **one** checkpoint on both directions at once — for every aligned
-`(text_quy, text_spa)` row it generates two training examples (quy→spa and
-spa→quy, tags swapped) — rather than training two separate models.
+`(text_quz, text_spa)` row it generates two training examples (quz→spa and
+spa→quz, tags swapped) — rather than training two separate models.
 
 ### Language codes
 
 | this project's code | NLLB FLORES-200 code |
 |---|---|
-| `quy` | `quy_Latn` (Ayacucho Quechua) |
+| `quz` | `quz_Latn` (Cusco-Collao Quechua) |
 | `spa` | `spa_Latn` |
 
-NLLB-200 ships with `quy_Latn` pretrained, so the base model has *some*
+NLLB-200 ships with `quz_Latn` pretrained, so the base model has *some*
 Quechua exposure already (fine-tuning specializes/improves it rather than
-starting from zero). That pretraining is on **Ayacucho** Quechua
-specifically — a closely related but not identical variety to the
-**Chanka** Quechua this project's audio/text actually is — so expect the
-fine-tune to need to close some dialect gap, not just a domain gap.
+starting from zero). Unlike this project's earlier Chanka setup — where the
+closest available NLLB code (`quy_Latn`, Ayacucho Quechua) was only an
+approximation of the actual dialect — `quz_Latn` is an exact match for the
+Collao variety this project now targets, so the fine-tune only has to close
+a domain gap, not a dialect gap.
 
 ## `translation/train.py` — fine-tuning
 
@@ -48,8 +48,8 @@ explicit allow-list — currently only `americasnlp*` sources are cleaned of
 `<unk>`-inducing characters, see `preprocessing/scripts/clean_text.py` —
 rather than "everything with non-blank `text_spa`", so a future source
 doesn't get pulled into training just by having both languages populated),
-building the bidirectional pair set from `--text-column-quy`/
-`--text-column-spa` (defaults `text_quy`/`text_spa`) for each. These splits
+building the bidirectional pair set from `--text-column-quz`/
+`--text-column-spa` (defaults `text_quz`/`text_spa`) for each. These splits
 are fixed at the data level (see `preprocessing/scripts/assign_splits.py`,
 80/10/10 stratified by `source`), shared with `stt/` and `tts/`, not
 re-derived here, so `test` rows are never loaded by this script —
@@ -72,13 +72,13 @@ rate, max length, etc).
 ## `translation/translate.py` — quick manual testing
 
 ```sh
-uv run translation/translate.py "Imaynallan kashanki?" --src quy --tgt spa
+uv run translation/translate.py "Imaynallan kashanki?" --src quz --tgt spa
 ```
 
 Translates one sentence with `--model` (default
 `$HF_USERNAME/nllb-quechua-spanish`); pass
 `--model facebook/nllb-200-distilled-600M` to compare against the untuned
-base model. `--src`/`--tgt` pick the direction (`quy`/`spa`); both ways
+base model. `--src`/`--tgt` pick the direction (`quz`/`spa`); both ways
 work out of the same model.
 
 ## Auth: `.env` + `HF_USERNAME`

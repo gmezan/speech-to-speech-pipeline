@@ -12,8 +12,8 @@ load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 DEFAULT_DATASET = f"{HF_USERNAME}/quechua-spanish-parallel"
-DEFAULT_AUDIO_COLUMN = "audio_quy"
-DEFAULT_TEXT_COLUMN = "text_quy"
+DEFAULT_AUDIO_COLUMN = "audio_quz"
+DEFAULT_TEXT_COLUMN = "text_quz"
 DEFAULT_MODEL = "openai/whisper-small"
 DEFAULT_OUTPUT_DIR = "./quechua_whisper_ready"
 DEFAULT_HUB_REPO_ID = f"{HF_USERNAME}/quechua-whisper-ready"

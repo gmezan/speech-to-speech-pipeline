@@ -8,7 +8,7 @@ pipeline wiring between them yet).
   [`gmezan/whisper-quechua`](https://huggingface.co/gmezan/whisper-quechua),
   the LoRA-fine-tuned Whisper model pushed by [`stt/`](../stt)).
 - **Text-to-Speech**: type Quechua text, synthesized by
-  [`facebook/mms-tts-quy`](https://huggingface.co/facebook/mms-tts-quy) — a
+  [`facebook/mms-tts-quz`](https://huggingface.co/facebook/mms-tts-quz) — a
   baseline MMS VITS model, standing in until the custom fine-tune from
   [`tts/`](../tts) is ready.
 
@@ -20,7 +20,7 @@ dedicated Quechua token, so fine-tuning repurposes the Spanish one to emit
 Quechua script — see
 [`dataset-schema.md`](../preprocessing/docs/dataset-schema.md)), not a sign
 the model was trained on any actual Spanish audio/text. `tts/`'s base
-(`facebook/mms-tts-quy`) is likewise a dedicated monolingual Quechua MMS
+(`facebook/mms-tts-quz`) is likewise a dedicated monolingual Quechua MMS
 checkpoint, never a Spanish one.
 
 For real Spanish STT/TTS, use the unrelated base models instead of the

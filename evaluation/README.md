@@ -41,7 +41,7 @@ text, not a reproduction of an existing recording), so this measures
 **round-trip intelligibility** instead: take the text from the same native
 `test` split (`tts/main.py` trains on `train`, validates on `validation`,
 never touches `test`), synthesize it with `--tts-model` (default
-`facebook/mms-tts-quy`,
+`facebook/mms-tts-quz`,
 the current baseline — swap to `$HF_USERNAME/vits-quechua` once `tts/`
 pushes a fine-tuned one), transcribe the synthesized audio with
 `--stt-model` (default `$HF_USERNAME/whisper-quechua`, the judge), and score
@@ -68,7 +68,7 @@ uv run eval_mt.py
 Loads the raw parallel dataset's native `test` split (default
 `$HF_USERNAME/quechua-spanish-parallel`) — assigned once per row by
 `preprocessing/scripts/assign_splits.py` as a deterministic hash of that
-row's own `(text_quy, text_spa)` content, **not** a random
+row's own `(text_quz, text_spa)` content, **not** a random
 `train_test_split` recomputed at eval time. That means this benchmark set is
 fixed regardless of how much the dataset grows later, and `translation/
 train.py` only ever loads `train`/`validation`, so no training decision
@@ -111,11 +111,10 @@ one-off numbers. Run `uv run eval_mt.py --help` for the full list of options.
   `americasnlp2024/minedu` and any other smaller `source` breakdown is
   the more informative signal for general-domain quality, despite its
   much smaller sample size.
-- NLLB's `quy_Latn` code is Ayacucho Quechua; this project otherwise
-  targets the Chanka variant. A dialect mismatch between the eval data and
-  the model's actual target variant would cap every model's score
-  regardless of fine-tuning quality — worth a manual spot-check before
-  trusting small deltas between runs.
+- NLLB's `quz_Latn` code is Cusco-Collao Quechua, an exact match for this
+  project's target variety (unlike the earlier Chanka setup, which only had
+  an approximate code to work with) — so this dialect-mismatch caveat no
+  longer applies, as long as the eval data itself is genuine `quz`.
 
 ## Shared code
 

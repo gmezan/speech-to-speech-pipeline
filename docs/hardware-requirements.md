@@ -48,7 +48,7 @@ weights differ.
 | variant | repo | disk (fp32 / fp16) | RAM (inference) | GPU VRAM (inference) | GPU VRAM (fine-tune) |
 |---|---|---|---|---|---|
 | Base (Spanish) | `facebook/mms-tts-spa` | 145MB / 73MB | <1GB | <1GB | ~8–12GB |
-| Base (Quechua, today's app fallback) | `facebook/mms-tts-quy` | 145MB / 73MB | <1GB | <1GB | ~8–12GB |
+| Base (Quechua, today's app fallback) | `facebook/mms-tts-quz` | 145MB / 73MB | <1GB | <1GB | ~8–12GB |
 | Fine-tuned (Quechua, not pushed yet) | `gmezan/vits-quechua` | 145MB / 73MB | <1GB | <1GB | ~8–12GB |
 
 The checkpoint itself is tiny, but fine-tuning (via the vendored
@@ -74,7 +74,7 @@ variant.
 ### A. Quechua-only deployment (no translation)
 
 Serving `app/` with just `gmezan/whisper-quechua` + `gmezan/vits-quechua`
-(or today's `facebook/mms-tts-quy` baseline) loaded at once:
+(or today's `facebook/mms-tts-quz` baseline) loaded at once:
 
 | | disk (fp16) | RAM | GPU VRAM (inference) |
 |---|---|---|---|
