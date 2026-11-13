@@ -122,8 +122,12 @@ def translate_batch(tokenizer, model, device, texts, src_lang, tgt_lang, max_len
     return tokenizer.batch_decode(generated, skip_special_tokens=True)
 
 
-def main():
-    args = parse_args()
+def run(args):
+    """Does the actual load/translate/score/append-results work for a fully-populated
+    args namespace (whatever parse_args() would produce) -- factored out of main() so
+    other scripts (eval_golden.py, compare_models_golden.py) can call this directly with
+    their own namespace instead of shelling out or duplicating this logic. Returns the
+    results dict (without the "timestamp" key added just before it's appended to disk)."""
     device = pick_device()
     print(f"Device: {device}")
 
@@ -209,6 +213,12 @@ def main():
         record = {**results, "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
         f.write(json.dumps(record) + "\n")
     print(f"\nAppended results to {args.results_path}")
+
+    return results
+
+
+def main():
+    run(parse_args())
 
 
 if __name__ == "__main__":

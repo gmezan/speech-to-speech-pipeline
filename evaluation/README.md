@@ -121,6 +121,45 @@ one-off numbers. Run `uv run eval_mt.py --help` for the full list of options.
   an approximate code to work with) — so this dialect-mismatch caveat no
   longer applies, as long as the eval data itself is genuine `quz`.
 
+## `eval_golden.py` — medical-domain out-of-domain check
+
+```sh
+uv run eval_golden.py --model gmezan/nllb-quechua-spanish --revision epoch-3
+```
+
+Same BLEU/chrF++ scoring as `eval_mt.py`, but against
+[`LosQuechuas/quechua-spanish-parallel-golden`](https://huggingface.co/datasets/LosQuechuas/quechua-spanish-parallel-golden)
+— a small (61-row), hand-curated, medical-domain golden set, used purely as
+an **out-of-domain generalization check**, not for training (too few rows
+to fine-tune on safely). All training/eval data so far
+(`americasnlp2024/jw300`) is religious-register text, so a steep quality
+drop here relative to the main `test`-split scores is expected, not a bug
+— this just measures how steep.
+
+Note: this external dataset predates the project's `quy`→`quz` rename and
+still uses the old `text_quy` column name — the *content* is genuine
+Collao Quechua, just under the old header (`eval_golden.py` hardcodes this
+override, nothing to configure). It also has no native splits (one `train`
+split, no `test`) and no `source` column, both handled automatically.
+
+## `compare_models_golden.py` — compare several models on the golden set in one pass
+
+```sh
+uv run compare_models_golden.py
+```
+
+Runs `eval_golden.py`'s scoring across several `label=repo_id[@revision]`
+entries (default: the untuned base model plus `epoch-1`/`epoch-2`/`epoch-3`
+of `$HF_USERNAME/nllb-quechua-spanish`) and writes one comparison table
+(`golden_summary.md` by default) instead of eyeballing separate runs. Each
+model's full results still append to `--results-path`
+(`golden_results.jsonl` by default). Override the model list with
+`--models`:
+
+```sh
+uv run compare_models_golden.py --models "mine=gmezan/nllb-quechua-spanish@epoch-2" "other=some/other-model"
+```
+
 ## `publish_model_card.py` — document eval results on the model card
 
 ```sh

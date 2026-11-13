@@ -236,3 +236,6 @@ tts/vits-*/
 *.pem
 .claude
 evaluation/mt_results.jsonl
+evaluation/golden_results.jsonl
+evaluation/golden_summary.md
+tmp

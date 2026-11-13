@@ -25,7 +25,6 @@ shape lets the raw data keep growing/changing without breaking
 | `audio_spa` | `Audio(sampling_rate=16000)` | Spanish speech recording of `text_spa` |
 | `speaker_quz` *(optional)* | `string` | recorder/speaker id for the Quechua take — enables speaker-aware TTS later and lets you check for speaker leakage across splits |
 | `speaker_spa` *(optional)* | `string` | same, for the Spanish take |
-| `split` *(optional)* | `string` | `"train"` / `"validation"` / `"test"`, if you want splits fixed at the data level instead of re-derived randomly on load |
 | `source` | `string` | which upstream dataset this row came from (e.g. `josemercado/quechua-chanka-asr`, `americasnlp2024/jw300`); use it to filter to rows with the column availability a given use case needs |
 
 Lowercase `text_<lang>` / `audio_<lang>` naming uses ISO 639-3 codes
