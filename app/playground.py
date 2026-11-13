@@ -28,9 +28,25 @@ STT_LANGUAGE = "spanish"  # decoder language anchor used during fine-tuning (see
 # Base Whisper checkpoint for genuine Spanish speech (separate from the Quechua fine-tune above).
 SPA_STT_MODEL_ID = os.environ.get("SPA_STT_MODEL_ID", "openai/whisper-small")
 
-# Base NLLB-200 checkpoint, to be swapped for a SPA->QUZ fine-tune later.
-MT_MODEL_ID = os.environ.get("MT_MODEL_ID", "facebook/nllb-200-distilled-600M")
-MT_LANG_CODES = {"Spanish": "spa_Latn", "Quechua": "quz_Latn"}
+# Fine-tuned NLLB-200 (LoRA, merged) from nlp/translation/train.py -- pass
+# MT_MODEL_ID=facebook/nllb-200-distilled-600M to compare against the untuned base
+# checkpoint instead; MT_MODEL_REVISION is ignored for that one (see below).
+BASE_MT_MODEL_ID = "facebook/nllb-200-distilled-600M"
+MT_MODEL_ID = os.environ.get("MT_MODEL_ID", f"{HF_USERNAME}/nllb-quechua-spanish")
+MT_MODEL_REVISION = os.environ.get("MT_MODEL_REVISION", "epoch-3")
+IS_BASE_MT_MODEL = MT_MODEL_ID == BASE_MT_MODEL_ID
+# -- revision: the base checkpoint has no "epoch-N" tags (those only exist on our own
+#    fine-tuned repo), so don't pass one when pointed at it.
+EFFECTIVE_MT_REVISION = None if IS_BASE_MT_MODEL else MT_MODEL_REVISION
+# -- language code: the fine-tuned model was trained tagging Quechua as "quz_Latn" --
+#    not a real pretrained NLLB language code (it resolves to the tokenizer's UNK token,
+#    id 3; verified via tokenizer.convert_tokens_to_ids), but LoRA fine-tuning adapted
+#    consistently around that signal, so this model expects the same tag at inference.
+#    The untuned base checkpoint has no such learned association -- querying it with
+#    "quz_Latn" would force generation off raw UNK with nothing trained to follow it, so
+#    use its real (if dialectally approximate) code, "quy_Latn", instead.
+QUECHUA_LANG_CODE = "quy_Latn" if IS_BASE_MT_MODEL else "quz_Latn"
+MT_LANG_CODES = {"Spanish": "spa_Latn", "Quechua": QUECHUA_LANG_CODE}
 
 
 def pick_device():
@@ -55,9 +71,9 @@ tts_tokenizer = AutoTokenizer.from_pretrained(TTS_MODEL_ID)
 tts_model = VitsModel.from_pretrained(TTS_MODEL_ID).to(DEVICE)
 tts_model.eval()
 
-print(f"Loading MT model ({MT_MODEL_ID})...")
-mt_tokenizer = AutoTokenizer.from_pretrained(MT_MODEL_ID)
-mt_model = AutoModelForSeq2SeqLM.from_pretrained(MT_MODEL_ID).to(DEVICE)
+print(f"Loading MT model ({MT_MODEL_ID}" + (f", revision={EFFECTIVE_MT_REVISION}" if EFFECTIVE_MT_REVISION else "") + ")...")
+mt_tokenizer = AutoTokenizer.from_pretrained(MT_MODEL_ID, revision=EFFECTIVE_MT_REVISION)
+mt_model = AutoModelForSeq2SeqLM.from_pretrained(MT_MODEL_ID, revision=EFFECTIVE_MT_REVISION).to(DEVICE)
 mt_model.eval()
 
 
@@ -126,7 +142,8 @@ with gr.Blocks(title="Quechua STT / TTS Playground") as demo:
         f"- **STT**: `{STT_MODEL_ID}` (Whisper, LoRA fine-tuned on Quechua)\n"
         f"- **Spanish STT**: `{SPA_STT_MODEL_ID}` (base Whisper)\n"
         f"- **TTS**: `{TTS_MODEL_ID}` (MMS VITS baseline, pending a custom fine-tune)\n"
-        f"- **MT**: `{MT_MODEL_ID}` (base NLLB-200, pending a SPA->QUZ fine-tune)"
+        f"- **MT**: `{MT_MODEL_ID}`"
+        + (f" (revision=`{EFFECTIVE_MT_REVISION}`)" if EFFECTIVE_MT_REVISION else " (untuned base checkpoint)")
     )
 
     with gr.Tab("Speech (SPA) -> Speech (QUZ)"):

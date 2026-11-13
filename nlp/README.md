@@ -23,16 +23,24 @@ spa→quz, tags swapped) — rather than training two separate models.
 
 | this project's code | NLLB FLORES-200 code |
 |---|---|
-| `quz` | `quz_Latn` (Cusco-Collao Quechua) |
+| `quz` | `quy_Latn` (Ayacucho/Chanka Quechua) |
 | `spa` | `spa_Latn` |
 
-NLLB-200 ships with `quz_Latn` pretrained, so the base model has *some*
-Quechua exposure already (fine-tuning specializes/improves it rather than
-starting from zero). Unlike this project's earlier Chanka setup — where the
-closest available NLLB code (`quy_Latn`, Ayacucho Quechua) was only an
-approximation of the actual dialect — `quz_Latn` is an exact match for the
-Collao variety this project now targets, so the fine-tune only has to close
-a domain gap, not a dialect gap.
+**Correction:** an earlier version of this doc claimed NLLB-200 ships a
+`quz_Latn` (Cusco-Collao) code that's an exact match for this project's
+target variety. That was wrong — verified directly against
+`facebook/nllb-200-distilled-600M`'s tokenizer,
+`convert_tokens_to_ids("quz_Latn")` returns the **UNK token id**, not a
+real language embedding; `"quz_Latn"` isn't a pretrained NLLB code at all.
+`quy_Latn` (Ayacucho/Chanka Quechua) is the real, closest available
+pretrained code, same as this project's earlier Chanka setup used — so
+there *is* a dialect gap between it and the Collao variety this project
+targets, on top of the domain gap. An earlier training run (tagged
+`epoch-1`/`epoch-2`/`epoch-3`, since retrained) used the fictitious
+`quz_Latn` code, meaning every Quechua-tagged example was actually tagged
+with UNK instead of a real language marker — it still trained and improved
+run over run, but without leveraging NLLB's pretrained Quechua knowledge at
+all.
 
 ## `translation/train.py` — fine-tuning
 

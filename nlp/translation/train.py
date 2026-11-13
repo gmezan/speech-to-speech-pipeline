@@ -4,6 +4,7 @@ import os
 from datasets import concatenate_datasets, load_dataset
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
+from huggingface_hub.errors import RevisionNotFoundError
 from peft import LoraConfig, get_peft_model
 from transformers import (
     AutoModelForSeq2SeqLM,
@@ -275,7 +276,16 @@ def main():
 
         if args.tag:
             print(f"9. Tagging this commit as '{args.tag}'...")
-            HfApi().create_tag(args.hub_repo_id, tag=args.tag, repo_type="model", exist_ok=True)
+            api = HfApi()
+            # create_tag(..., exist_ok=True) only suppresses the "already exists" error --
+            # it does NOT move an existing tag to the new commit, silently leaving it
+            # pointing at whatever was tagged before. Delete-then-recreate so re-running
+            # the same --tag (e.g. retraining "epoch-1" from scratch) actually moves it.
+            try:
+                api.delete_tag(args.hub_repo_id, tag=args.tag, repo_type="model")
+            except RevisionNotFoundError:
+                pass  # tag didn't exist yet -- nothing to move
+            api.create_tag(args.hub_repo_id, tag=args.tag, repo_type="model")
 
     print("Done! Translation model is ready.")
 

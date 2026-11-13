@@ -20,9 +20,15 @@ DEFAULT_MODEL = f"{HF_USERNAME}/nllb-quechua-spanish"
 DEFAULT_MAX_LENGTH = 128
 DEFAULT_RESULTS_PATH = "mt_results.jsonl"
 
-# Same FLORES-200 codes as translation/common.py (quz_Latn = Cusco-Collao
-# Quechua, an exact match for this project's target variety).
-LANG_CODES = {"quz": "quz_Latn", "spa": "spa_Latn"}
+# Same FLORES-200 codes as translation/common.py. "quz_Latn" is NOT a real
+# pretrained NLLB code (verified: convert_tokens_to_ids("quz_Latn") returns the
+# UNK token id) -- "quy_Latn" (Ayacucho/Chanka Quechua) is the real, closest
+# available pretrained code, and what training now tags Quechua with. This
+# applies uniformly to the base checkpoint and every fine-tuned model trained
+# after that switch, so there's no model-specific branching needed here (unlike
+# app/playground.py, which still special-cases the *old*, already-pushed
+# quz_Latn/UNK-tagged epoch checkpoints until they're retrained).
+LANG_CODES = {"quz": "quy_Latn", "spa": "spa_Latn"}
 
 # Characters NLLB's SentencePiece vocab has no entry for (verified
 # empirically against facebook/nllb-200-distilled-600M -- they decode to

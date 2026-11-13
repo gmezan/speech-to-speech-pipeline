@@ -116,10 +116,15 @@ one-off numbers. Run `uv run eval_mt.py --help` for the full list of options.
   `americasnlp2024/minedu` and any other smaller `source` breakdown is
   the more informative signal for general-domain quality, despite its
   much smaller sample size.
-- NLLB's `quz_Latn` code is Cusco-Collao Quechua, an exact match for this
-  project's target variety (unlike the earlier Chanka setup, which only had
-  an approximate code to work with) — so this dialect-mismatch caveat no
-  longer applies, as long as the eval data itself is genuine `quz`.
+- NLLB has no real `quz_Latn` (Cusco-Collao) code — an earlier version of
+  this doc claimed otherwise, which was wrong (verified:
+  `convert_tokens_to_ids("quz_Latn")` returns the tokenizer's UNK token id,
+  not a real language embedding). This project now tags Quechua with
+  `quy_Latn` (Ayacucho/Chanka), the real, closest available pretrained
+  code — same dialect-mismatch caveat as the project's earlier Chanka
+  setup applies again: it's an approximation, not an exact match, so some
+  of any quality gap may be dialectal rather than purely about fine-tuning
+  quality.
 
 ## `eval_golden.py` — medical-domain out-of-domain check
 
