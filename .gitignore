@@ -223,6 +223,7 @@ __marimo__/
 output.wav
 quechua_ready.tar.gz
 quechua_whisper_ready/
+golden_dataset/
 whisper-quechua-lora/
 whisper-quechua-lora-final/
 tts/finetune_hf_vits/mms-tts-*-train/
