@@ -22,7 +22,10 @@ load_dotenv()
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "gmezan")
 STT_MODEL_ID = f"{HF_USERNAME}/whisper-quechua"
-TTS_MODEL_ID = f"{HF_USERNAME}/vits-quechua"
+# $HF_USERNAME/vits-quechua (tts/'s fine-tuned output) hasn't been trained/pushed for
+# real yet -- defaults to the MMS baseline so this tab actually works today; pass
+# TTS_MODEL_ID=gmezan/vits-quechua once that exists to switch to the fine-tune.
+TTS_MODEL_ID = os.environ.get("TTS_MODEL_ID", "facebook/mms-tts-quz")
 STT_LANGUAGE = "spanish"  # decoder language anchor used during fine-tuning (see preprocessing/)
 
 # Base Whisper checkpoint for genuine Spanish speech (separate from the Quechua fine-tune above).

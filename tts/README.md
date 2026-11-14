@@ -169,6 +169,19 @@ None of this changes the training math — see the diffs in
 `finetune_hf_vits/` for exact changes (it's vendored source, not a
 dependency, so they're plain edits, not a patch file).
 
+## Try the baseline first
+
+Before investing in a real training run, listen to
+[`facebook/mms-tts-quz`](https://huggingface.co/facebook/mms-tts-quz)
+directly — no fine-tuning needed, `app/playground.py`'s TTS tab already
+defaults to it. Worth confirming it actually sounds like the target
+variety before trusting the label: this project already got burned once by
+a Hub model-naming assumption that turned out wrong (`quz_Latn` on NLLB
+wasn't a real pretrained code — see `nlp/README.md`), so a quick human
+listen here is cheap insurance against the same mistake happening with a
+different model/vocabulary (MMS's naming scheme) before sinking GPU time
+into fine-tuning it.
+
 ## Verified
 
 `uv sync`, `--help`, and a full tiny end-to-end run (`--limit 8`, 1 epoch,

@@ -28,6 +28,16 @@ MT_MODEL_REVISION=<tag/branch/commit, default epoch-3, ignored for the base mode
 Pass `MT_MODEL_ID=facebook/nllb-200-distilled-600M` to compare against the
 untuned base checkpoint instead of the fine-tune.
 
+## TTS model
+
+```
+TTS_MODEL_ID=<repo id, default facebook/mms-tts-quz>
+```
+
+Defaults to the MMS baseline since `$HF_USERNAME/vits-quechua` (`tts/`'s
+fine-tuned output) hasn't been trained/pushed for real yet. Pass
+`TTS_MODEL_ID=gmezan/vits-quechua` once that exists to switch to it.
+
 The fine-tuned model was trained tagging Quechua as `quz_Latn` — not a real
 pretrained NLLB language code (it resolves to the tokenizer's UNK token, not
 a dedicated language embedding), but LoRA fine-tuning adapted consistently
